@@ -18,6 +18,96 @@ index 482a832..20e8a22 100644
      "JointEffortActionCfg",
      "TerminationTermCfg",
      # Commands
+diff --git a/src/mjswan/adapters/mjlab_adapter.py b/src/mjswan/adapters/mjlab_adapter.py
+index e2afa3f..08f72cb 100644
+--- a/src/mjswan/adapters/mjlab_adapter.py
++++ b/src/mjswan/adapters/mjlab_adapter.py
+@@ -39,6 +39,7 @@ from ..envs.mdp.actions.actions import (
+ from ..envs.mdp.actions.actions import (
+     JointPositionActionCfg,
+     ReferenceJointPositionActionCfg,
++    RelativeJointPositionActionCfg,
+ )
+ from ..envs.mdp.events import EventBinding
+ from ..envs.mdp.events import _custom_registry as _custom_event_registry
+@@ -624,7 +625,12 @@ def resolve_pd_gains(
+ 
+     for term in actions.values():
+         if not isinstance(
+-            term, (JointPositionActionCfg, ReferenceJointPositionActionCfg)
++            term,
++            (
++                JointPositionActionCfg,
++                ReferenceJointPositionActionCfg,
++                RelativeJointPositionActionCfg,
++            ),
+         ):
+             continue
+         if term.stiffness is not None or term.damping is not None:
+diff --git a/src/mjswan/adapters/mjlab_compat.py b/src/mjswan/adapters/mjlab_compat.py
+index 2712f62..a565185 100644
+--- a/src/mjswan/adapters/mjlab_compat.py
++++ b/src/mjswan/adapters/mjlab_compat.py
+@@ -7,8 +7,58 @@ from typing import Any
+ import mujoco
+ 
+ 
++#: mjlab's string-valued ``MujocoCfg`` fields, and the MuJoCo enum each maps to.
++#: mjlab hands these to `mj_model.opt` at startup; the browser compiles the bundled XML
++#: instead, so they have to reach `spec.option` or the sim silently runs MuJoCo's
++#: defaults — Euler, a pyramidal cone, `impratio` 1 — under the task's own name.
++_ENUM_FIELDS: tuple[tuple[str, Any, str], ...] = (
++    ("integrator", mujoco.mjtIntegrator, "mjINT_"),
++    ("cone", mujoco.mjtCone, "mjCONE_"),
++    ("jacobian", mujoco.mjtJacobian, "mjJAC_"),
++    ("solver", mujoco.mjtSolver, "mjSOL_"),
++)
++
++#: The plain numeric ones, same name on both sides.
++_SCALAR_FIELDS: tuple[str, ...] = (
++    "timestep",
++    "impratio",
++    "iterations",
++    "tolerance",
++    "ls_iterations",
++    "ls_tolerance",
++    "ccd_iterations",
++)
++
++
+ def _apply_mujoco_cfg_to_option(mujoco_cfg: Any, option: Any) -> None:
+-    """Apply mjlab ``MujocoCfg`` option flags to a MuJoCo option object."""
++    """Apply an mjlab ``MujocoCfg`` to a MuJoCo option object.
++
++    Every field mjlab sets, not just the flags: a task that asks for an elliptic
++    friction cone and gets a pyramidal one is not the task it configured, and nothing
++    downstream says so.
++    """
++    for field_name in _SCALAR_FIELDS:
++        value = getattr(mujoco_cfg, field_name, None)
++        if value is not None:
++            setattr(option, field_name, value)
++
++    for field_name, enum_type, prefix in _ENUM_FIELDS:
++        value = getattr(mujoco_cfg, field_name, None)
++        if value is None:
++            continue
++        member = getattr(enum_type, f"{prefix}{str(value).upper()}", None)
++        if member is None:
++            raise ValueError(
++                f"mjlab `MujocoCfg.{field_name}={value!r}` names no "
++                f"`{enum_type.__name__}` member; the browser would silently run "
++                f"MuJoCo's default instead."
++            )
++        setattr(option, field_name, member)
++
++    gravity = getattr(mujoco_cfg, "gravity", None)
++    if gravity is not None:
++        option.gravity = list(gravity)
++
+     for field_name, enum_type, prefix in (
+         ("disableflags", mujoco.mjtDisableBit, "mjDSBL_"),
+         ("enableflags", mujoco.mjtEnableBit, "mjENBL_"),
 diff --git a/src/mjswan/envs/mdp/actions/__init__.py b/src/mjswan/envs/mdp/actions/__init__.py
 index c1e09ba..0e9414f 100644
 --- a/src/mjswan/envs/mdp/actions/__init__.py
