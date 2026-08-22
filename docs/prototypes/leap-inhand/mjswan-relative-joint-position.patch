@@ -1,0 +1,404 @@
+diff --git a/src/mjswan/__init__.py b/src/mjswan/__init__.py
+index 482a832..20e8a22 100644
+--- a/src/mjswan/__init__.py
++++ b/src/mjswan/__init__.py
+@@ -32,6 +32,7 @@ from .envs.mdp.actions import (
+     ActionTermCfg,
+     JointEffortActionCfg,
+     JointPositionActionCfg,
++    RelativeJointPositionActionCfg,
+ )
+ from .envs.mdp.events import EventBinding, register_event
+ from .envs.mdp.observations import ObservationBinding, register_observation
+@@ -77,6 +78,7 @@ __all__ = [
+     "ObservationTermCfg",
+     "ActionTermCfg",
+     "JointPositionActionCfg",
++    "RelativeJointPositionActionCfg",
+     "JointEffortActionCfg",
+     "TerminationTermCfg",
+     # Commands
+diff --git a/src/mjswan/envs/mdp/actions/__init__.py b/src/mjswan/envs/mdp/actions/__init__.py
+index c1e09ba..0e9414f 100644
+--- a/src/mjswan/envs/mdp/actions/__init__.py
++++ b/src/mjswan/envs/mdp/actions/__init__.py
+@@ -18,6 +18,7 @@ from .actions import (
+     JointVelocityActionCfg,
+     MuscleActivationActionCfg,
+     ReferenceJointPositionActionCfg,
++    RelativeJointPositionActionCfg,
+     SiteEffortActionCfg,
+     TendonEffortActionCfg,
+     TendonLengthActionCfg,
+@@ -30,6 +31,7 @@ __all__ = [
+     "JointPositionActionCfg",
+     "JointVelocityActionCfg",
+     "ReferenceJointPositionActionCfg",
++    "RelativeJointPositionActionCfg",
+     "JointEffortActionCfg",
+     "MuscleActivationActionCfg",
+     "TendonLengthActionCfg",
+diff --git a/src/mjswan/envs/mdp/actions/actions.py b/src/mjswan/envs/mdp/actions/actions.py
+index 45af0e0..3241f6d 100644
+--- a/src/mjswan/envs/mdp/actions/actions.py
++++ b/src/mjswan/envs/mdp/actions/actions.py
+@@ -187,6 +187,48 @@ class ReferenceJointPositionActionCfg(BaseActionCfg):
+         return entry
+ 
+ 
++@dataclass(kw_only=True)
++class RelativeJointPositionActionCfg(BaseActionCfg):
++    """Joint position targets relative to the *measured* joint positions.
++
++    ``q_cmd = q(t) + scale * a``. Mirrors
++    ``mjlab.envs.mdp.actions.actions.RelativeJointPositionActionCfg``: the target is
++    re-based on the current position every control step, so — unlike an integrator on
++    the previous command — the term carries no state, and the browser needs none.
++
++    ``offset`` has no meaning when the base is the live position, and mjlab refuses a
++    non-zero one; so does this. ``clip`` bounds the *delta* before it is added, which
++    is where mjlab applies it for this term and nowhere else.
++    """
++
++    stiffness: float | list[float] | dict[str, float] | None = None
++    """Position gain (kp). mjswan-specific; see :class:`JointPositionActionCfg`."""
++
++    damping: float | list[float] | dict[str, float] | None = None
++    """Velocity gain (kd). mjswan-specific; see :class:`JointPositionActionCfg`."""
++
++    def to_dict(self) -> dict[str, Any]:
++        if self.unsupported_reason is not None:
++            raise NotImplementedError(self.unsupported_reason)
++        if self.offset != 0.0:
++            raise ValueError(
++                "RelativeJointPositionActionCfg takes no `offset`: the target is "
++                "`current_pos + scale * a`, so a fixed offset has no meaning. mjlab "
++                "raises the same error in its own `__post_init__`."
++            )
++
++        entry: dict[str, Any] = {"type": "joint_position_relative"}
++        if self.scale != 1.0:
++            entry["scale"] = self.scale
++        entry["actuator_names"] = list(self.actuator_names)
++        if self.stiffness is not None:
++            entry["stiffness"] = self.stiffness
++        if self.damping is not None:
++            entry["damping"] = self.damping
++        self._add_clip(entry)
++        return entry
++
++
+ @dataclass(kw_only=True)
+ class JointVelocityActionCfg(BaseActionCfg):
+     """Configuration for joint velocity control.
+diff --git a/src/mjswan/template/src/core/action/__tests__/applyAction.test.ts b/src/mjswan/template/src/core/action/__tests__/applyAction.test.ts
+index b913f7d..5769258 100644
+--- a/src/mjswan/template/src/core/action/__tests__/applyAction.test.ts
++++ b/src/mjswan/template/src/core/action/__tests__/applyAction.test.ts
+@@ -385,3 +385,99 @@ describe('readClipActions / clampActions', () => {
+     warn.mockRestore();
+   });
+ });
++
++describe('applyAction — joint_position_relative', () => {
++  it('re-bases on the live position each call, so it carries no state', () => {
++    const data = fakeData(2, [0.3, -0.1]);
++    const t = term({
++      controlType: 'joint_position_relative',
++      actionScale: Float32Array.from([0.5, 0.5]),
++    });
++    applyAction(data, [t], Float32Array.from([1, 1]));
++    expect(Array.from(data.ctrl)).toEqual([0.8, 0.4]);
++
++    // Same action again, but the sim has moved: the target follows the position, it
++    // does not accumulate. An integrator would read 1.3 / 0.9 here.
++    data.qpos[0] = 0.7;
++    data.qpos[1] = 0.2;
++    applyAction(data, [t], Float32Array.from([1, 1]));
++    expect(Array.from(data.ctrl)).toEqual([1.2, 0.7]);
++  });
++
++  it('clamps the delta, not the finished target — where mjlab applies clip here', () => {
++    const data = fakeData(2, [10, 10]);
++    applyAction(
++      data,
++      [
++        term({
++          controlType: 'joint_position_relative',
++          clipLo: Float32Array.from([-0.25, -0.25]),
++          clipHi: Float32Array.from([0.25, 0.25]),
++        }),
++      ],
++      Float32Array.from([1, -1]),
++    );
++    // Target 10 ± 1 would be clipped away entirely if the bound applied to the sum.
++    expect(Array.from(data.ctrl)).toEqual([10.25, 9.75]);
++  });
++
++  it('still removes the encoder bias from the commanded target', () => {
++    const data = fakeData(2, [0.3, -0.1]);
++    applyAction(
++      data,
++      [
++        term({
++          controlType: 'joint_position_relative',
++          encoderBias: Float32Array.from([0.05, -0.05]),
++        }),
++      ],
++      Float32Array.from([0.1, 0.1]),
++    );
++    expect(data.ctrl[0]).toBeCloseTo(0.3 + 0.1 - 0.05, 6);
++    expect(data.ctrl[1]).toBeCloseTo(-0.1 + 0.1 + 0.05, 6);
++  });
++});
++
++describe('applyAction — joint_pos_target recording', () => {
++  it('records the pre-bias target per qpos address, as mjlab stores the field', () => {
++    // The term's joints live at qpos 2/3, so the buffer is addressed there, not at 0.
++    const data = fakeData(2, [9, 9, 0.3, -0.1]);
++    const out = new Float32Array(4);
++    applyAction(
++      data,
++      [
++        term({
++          controlType: 'joint_position_relative',
++          qposAdr: [2, 3],
++          encoderBias: Float32Array.from([0.05, 0.05]),
++          jointPosTargetOut: out,
++        }),
++      ],
++      Float32Array.from([0.1, 0.2]),
++    );
++    // mjlab's `set_joint_position_target` receives the target before the actuator
++    // takes the bias off, so an observation reading the field must see it unbiased.
++    expect(out[2]).toBeCloseTo(0.3 + 0.1, 6);
++    expect(out[3]).toBeCloseTo(-0.1 + 0.2, 6);
++    // Untouched joints keep mjlab's zero.
++    expect(Array.from(out.subarray(0, 2))).toEqual([0, 0]);
++  });
++
++  it('records an absolute joint_position target too, not just a relative one', () => {
++    const data = fakeData(2, [0, 0]);
++    const out = new Float32Array(2);
++    applyAction(
++      data,
++      [
++        term({
++          defaultJointPos: Float32Array.from([0.5, -0.2]),
++          actionScale: Float32Array.from([2, 2]),
++          jointPosTargetOut: out,
++        }),
++      ],
++      Float32Array.from([0.25, 0.5]),
++    );
++    expect(out[0]).toBeCloseTo(1, 6);
++    expect(out[1]).toBeCloseTo(0.8, 6);
++  });
++});
+diff --git a/src/mjswan/template/src/core/action/applyAction.ts b/src/mjswan/template/src/core/action/applyAction.ts
+index b6a43d8..42013b7 100644
+--- a/src/mjswan/template/src/core/action/applyAction.ts
++++ b/src/mjswan/template/src/core/action/applyAction.ts
+@@ -12,6 +12,7 @@ type MjData = import('mujoco').MjData;
+ /** mjlab's `ActionTermCfg` kinds this runtime implements. */
+ export type ControlType =
+   | 'joint_position'
++  | 'joint_position_relative'
+   | 'joint_position_reference'
+   | 'torque'
+   | 'muscle_activation';
+@@ -34,6 +35,13 @@ export interface ResolvedActionTerm {
+    * stands in — a still robot rather than one folded into zeros.
+    */
+   referenceJointPos?: Float32Array | null;
++  /**
++   * Where to record this term's position target, indexed by `mjData.qpos` address —
++   * mjlab's `Entity.data.joint_pos_target`, which an observation may read back. The
++   * engine owns one buffer per model and hands the same one to every position term.
++   * Pre-encoder-bias, as `set_joint_position_target` receives it in mjlab.
++   */
++  jointPosTargetOut?: Float32Array | null;
+   encoderBias: Float32Array;
+   /**
+    * Per-actuator: true = position (`biastype=affine`), so `ctrl` is a target and MuJoCo
+@@ -92,19 +100,32 @@ function applyActionTerm(
+   const numJoints = ctrlAdr.length;
+   const ctrl = mjData.ctrl;
+ 
+-  if (controlType === 'joint_position' || controlType === 'joint_position_reference') {
++  if (
++    controlType === 'joint_position' ||
++    controlType === 'joint_position_relative' ||
++    controlType === 'joint_position_reference'
++  ) {
+     const reference = term.referenceJointPos ?? null;
++    const relative = controlType === 'joint_position_relative';
++    const targetOut = term.jointPosTargetOut ?? null;
+     for (let i = 0; i < numJoints; i++) {
+       const ctrlIndex = ctrlAdr[i];
+       if (ctrlIndex < 0) continue;
+       const actionValue = actions[actionIndices[i]] ?? 0;
+-      const base = reference ? (reference[actionIndices[i]] ?? 0) : defaultJointPos[i];
++      // Relative re-bases on the live position and clamps the *delta*, which is where
++      // mjlab applies `clip` for this term; the others clamp the finished target.
++      const processed = relative
++        ? mjData.qpos[qposAdr[i]] +
++          clamp(actionScale[i] * actionValue, term.clipLo[i], term.clipHi[i])
++        : clamp(
++            (reference ? (reference[actionIndices[i]] ?? 0) : defaultJointPos[i]) +
++              actionOffset[i] +
++              actionScale[i] * actionValue,
++            term.clipLo[i],
++            term.clipHi[i],
++          );
++      if (targetOut) targetOut[qposAdr[i]] = processed;
+       // Un-bias the target: the policy was trained against a biased reading.
+-      const processed = clamp(
+-        base + actionOffset[i] + actionScale[i] * actionValue,
+-        term.clipLo[i],
+-        term.clipHi[i],
+-      );
+       const target = processed - encoderBias[i];
+ 
+       if (positionActuator[i]) {
+diff --git a/src/mjswan/template/src/core/engine/runtime.ts b/src/mjswan/template/src/core/engine/runtime.ts
+index 7f1375d..3b622f5 100644
+--- a/src/mjswan/template/src/core/engine/runtime.ts
++++ b/src/mjswan/template/src/core/engine/runtime.ts
+@@ -237,6 +237,13 @@ export class mjswanRuntime {
+   private raycastSensors: Record<string, RaycastSensorDescriptor> = {};
+   /** Owned here, not by the slot reader: the history advances per substep. */
+   private contactSensors = new ContactSensorSet();
++  /**
++   * mjlab's `Entity.data.joint_pos_target`, by qpos address: what the position action
++   * terms last commanded. MuJoCo keeps no such array — `ctrl` holds the post-bias value
++   * for a position actuator and a torque for a motor — so the action layer records it
++   * here for any observation that reads the field back. Sized with the model.
++   */
++  private jointPosTarget: Float32Array | null = null;
+ 
+   constructor(mujoco: MainModule, container: HTMLElement, termSeed = DEFAULT_TERM_SEED) {
+     this.mujoco = mujoco;
+@@ -260,6 +267,7 @@ export class mjswanRuntime {
+         jointBias: (name) => this.jointBias.get(name) ?? 0,
+         raycastSensors: () => this.raycastSensors,
+         contactSensors: () => this.contactSensors,
++        jointPosTarget: () => this.jointPosTarget,
+       },
+     );
+ 
+@@ -527,6 +535,10 @@ export class mjswanRuntime {
+ 
+       this.mujocoRoot = this.scene.getObjectByName('MuJoCo Root') as THREE.Group | null;
+ 
++      // Before any policy attaches: `buildPolicyControl` hands this same buffer to
++      // every position term, so it has to exist by then.
++      this.jointPosTarget = new Float32Array(this.mjModel.nq);
++
+       this.mujoco.mj_forward(this.mjModel, this.mjData);
+       updateLightsFromData(this.mujoco, this.mjData, this.lights);
+       updateHeadlightFromCamera(this.camera, this.lights);
+@@ -1019,6 +1031,7 @@ export class mjswanRuntime {
+         actionScale,
+         actionOffset,
+         defaultJointPos,
++        jointPosTargetOut: this.jointPosTarget,
+         encoderBias,
+         positionActuator,
+         kp,
+@@ -1065,6 +1078,7 @@ export class mjswanRuntime {
+       const controlType = actionTerm.type ?? 'joint_position';
+       if (
+         controlType !== 'joint_position' &&
++        controlType !== 'joint_position_relative' &&
+         controlType !== 'joint_position_reference' &&
+         controlType !== 'torque' &&
+         controlType !== 'muscle_activation'
+@@ -1105,6 +1119,8 @@ export class mjswanRuntime {
+           actionScale,
+           actionOffset,
+           defaultJointPos: new Float32Array(n),
++          // A muscle actuator commands excitation, not a joint position target.
++          jointPosTargetOut: null,
+           encoderBias: new Float32Array(n),
+           positionActuator: new Array(n).fill(false),
+           kp: new Float32Array(n),
+@@ -1145,6 +1161,8 @@ export class mjswanRuntime {
+       const useDefaultOffset = actionTerm.use_default_offset !== undefined
+         ? actionTerm.use_default_offset
+         : controlType === 'joint_position';
++      // `joint_position_relative` bases on the live position, never the default pose.
++      const relativeOffset = controlType === 'joint_position_relative' ? false : useDefaultOffset;
+ 
+       const entry = buildEntry(
+         termKey,
+@@ -1154,7 +1172,7 @@ export class mjswanRuntime {
+         actionTerm.offset as number[] | number | Record<string, number> | undefined,
+         actionTerm.stiffness as number[] | number | Record<string, number> | undefined,
+         actionTerm.damping as number[] | number | Record<string, number> | undefined,
+-        useDefaultOffset,
++        relativeOffset,
+         actionTerm.clip as Record<string, readonly number[]> | undefined
+       );
+       if (controlType === 'joint_position_reference') {
+@@ -1234,6 +1252,9 @@ export class mjswanRuntime {
+     // With the sim state, as mjlab does: a force from before the reset would otherwise
+     // keep an `illegal_contact` term firing.
+     this.contactSensors.reset();
++    // mjlab's `EntityData.reset` zeroes `joint_pos_target`; an observation reading it
++    // on the first frame after a reset must not see the last episode's command.
++    this.jointPosTarget?.fill(0);
+     // Reset with the sim state, not the terms: it reads nothing from the scene.
+     if (this.onnxModule) {
+       this.onnxInputDict = this.onnxModule.initInput();
+diff --git a/src/mjswan/template/src/core/onnx/slotReader.ts b/src/mjswan/template/src/core/onnx/slotReader.ts
+index 2be8b4b..d93ee2b 100644
+--- a/src/mjswan/template/src/core/onnx/slotReader.ts
++++ b/src/mjswan/template/src/core/onnx/slotReader.ts
+@@ -42,6 +42,12 @@ export type SlotReaderOptions = {
+   raycastSensors?: () => Record<string, RaycastSensorDescriptor>;
+   /** The engine owns these, since it advances their history per substep. */
+   contactSensors?: () => ContactSensorSet | null;
++  /**
++   * mjlab's `Entity.data.joint_pos_target`, by `mjData.qpos` address: what the position
++   * action terms last commanded. A function because the buffer is sized against the
++   * model, which arrives after the reader. Null before any term has written.
++   */
++  jointPosTarget?: () => ArrayLike<number> | null;
+ };
+ 
+ /** Everything about one entity that resolving its fields needs, computed once. */
+@@ -196,7 +202,11 @@ function rootLinkVelW(rootBodyId: number, mjData: MjData): Float32Array {
+   return concat(lin, ang);
+ }
+ 
+-type FieldReader = (index: EntityIndex, mjData: MjData) => Float32Array | null;
++type FieldReader = (
++  index: EntityIndex,
++  mjData: MjData,
++  options: SlotReaderOptions,
++) => Float32Array | null;
+ 
+ /** Wrap a reader needing a root body. Null, since indexing at -1 gives plausible zeros. */
+ function rootField(read: (root: number, mjData: MjData) => Float32Array): FieldReader {
+@@ -221,6 +231,12 @@ const FIELD_READERS: Record<string, FieldReader> = {
+     return out;
+   },
+   joint_vel: (index, mjData) => gather(mjData.qvel, index.qvelAdr),
++  // Not read off `mjData`: MuJoCo keeps no such array. mjlab's `joint_pos_target` is
++  // what the action term last commanded, so the engine records it and hands it here.
++  joint_pos_target: (index, _mjData, options) => {
++    const targets = options.jointPosTarget?.();
++    return targets ? gather(targets, index.qposAdr) : null;
++  },
+ 
+   root_link_pos_w: rootField((root, mjData) => vec3At(mjData.xpos, root)),
+   root_link_quat_w: rootField((root, mjData) => quatAt(mjData.xquat, root)),
+@@ -385,6 +401,6 @@ export function createSlotReader(
+ 
+     const read = slot.field ? FIELD_READERS[slot.field] : undefined;
+     if (!read) return null;
+-    return read(indexFor(mjModel, slot.entity), mjData);
++    return read(indexFor(mjModel, slot.entity), mjData, options);
+   };
+ }

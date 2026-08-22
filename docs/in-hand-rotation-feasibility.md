@@ -23,6 +23,11 @@
 | playground 側で書く作業 | 6 件 |
 | 想定工数 | 3–5 日 |
 
+> **追記 (2026-08-21, 同日): 実装して動かしました。**
+> mjlab にあって mjswan にない汎用機能を mjswan 側に取り込み、ブラウザで実際に走らせました。
+> 動くデモ・パッチ・録画は [`prototypes/leap-inhand/`](prototypes/leap-inhand/) にあります。
+> 下記の見積もりのうち、実測で変わった点は「実装結果」節にまとめてあります。
+
 ## 載せる対象
 
 LEAP ハンド（16 自由度・固定基部）が手のひらでキューブを回し続ける。HORA の報酬設計を mjlab 上に
@@ -227,3 +232,60 @@ LEAP Hand Sim / HORA の 3 者を明記する。
 | grasp cache | 7,700 サンプル | npz ヘッダ |
 | mjlab 参照 解決 / 不整合 | 61 / 6 | AST 走査 |
 | 上流の最終コミット | 2026-02-20 | git log |
+
+---
+
+# 実装結果（2026-08-21 追記）
+
+「mjlab に実装済みで mjswan にない汎用機能なら mjswan 側に取り込む」という方針で実装し、
+ブラウザで実際に動かしました。デモ・パッチ・録画は
+[`prototypes/leap-inhand/`](prototypes/leap-inhand/)。
+
+## 取り込んだもの（すべて mjlab パリティ、タスク固有ではない）
+
+| 追加 | mjlab 側の対応物 | 汎用である理由 |
+|---|---|---|
+| `RelativeJointPositionActionCfg` + TS の `joint_position_relative` | `mjlab.envs.mdp.actions.RelativeJointPositionActionCfg` | mjlab の行動項をそのまま移植。mjswan は互換スタブすら持っていなかった |
+| `slotReader` の `joint_pos_target` | `Entity.data.joint_pos_target` | 自分の位置指令を観測する任意のタスクが読む素のフィールド。MuJoCo には対応配列がない（`ctrl` はバイアス減算後の目標かトルク）ので行動層が記録する |
+| リセット時の同フィールドのゼロ化 | `EntityData.reset` | これがないとエピソード初フレームが前エピソードの指令を見る |
+
+記録は全ての位置系行動項が行うため、`joint_position` と `joint_position_reference`
+もこの観測を得ます。テストは 367 件パス（うち新規 5 件）。
+
+## 当初の見立てから変わった点
+
+**BLOCKER 02 は「ネイティブ観測マーカーの新設」ではなかった。** 本文では
+`last_action` と同じ扱いにする、と書きましたが、実際には `joint_pos_target` が
+mjlab の `EntityData` に元からあるフィールドで、`slotReader` の `FIELD_READERS` に
+1 エントリ足すだけで済みました。上流の観測関数は行動項が内部状態を持たないとき
+このフィールドにフォールバックするので、**mjlab の関数が無改造でトレースできます**。
+
+**BLOCKER 01 は半分だけ mjlab が持っていた。** mjlab の
+`RelativeJointPositionAction` は `q_cmd = q + delta`（測定値基準・無状態）で、
+上流の `q_cmd += delta`（指令値基準・積分）とは別物です。汎用部分は mjlab から
+取り込めましたが、**指令値積分そのものは mjlab にないので今回は入れていません**。
+
+**工数**: Phase 1（mjswan 側）は 1–2 日と見積もりましたが、汎用部分に限れば
+実測で数時間でした。Phase 2・3 は見積もりどおり。
+
+## 実際に走った証拠
+
+ビルドは全項トレースを通過し、生成された `policy.json` は次のとおり:
+
+- 行動: `{"type": "joint_position_relative", "scale": 0.0417}` — 新しい項が選ばれている
+- 観測 1: `joint_pos_biased` スロット、16 次元、履歴 9→0
+- 観測 2: **`joint_pos_target` スロット**、16 次元、履歴 9→0 — 新しいフィールドリーダ
+- 終了条件: `cube` エンティティの `root_link_pos_w` — 2 体目のエンティティも普通に読める
+- `clip_actions: 1.0`
+
+ヘッドレス Chromium（SwiftShader）で 90 秒連続実行し、キューブを落とさず回し続けました。
+行動項が未対応なら `ctrl` が全ゼロになり手が脱力してキューブは即落下するので、
+これ自体が新しい項が実際に効いている証拠です。
+
+## 残っている忠実度のギャップ
+
+接触下では測定値が指令値に遅れるため、積分型が保持できる目標を相対型は保持できません。
+デモは 90 秒間把持・回転を続けましたが、**上流の再現ではありません**。回転レートを
+上流 env と突き合わせた測定はまだしていません。埋めるには指令値基準の変種
+（同じクラスのフラグが妥当）が要りますが、これは mjlab にない機能なので、
+今回のパッチとは別の判断になります。
