@@ -7,8 +7,8 @@ released yet (the patch beside it), so `registry.py` does not know about it.
 
 ![the demo running](leap_inhand_rotation.gif)
 
-90 s of playback at 6.2× speed, captured from headless Chromium. The policy holds the
-cube and rotates it for the whole run.
+About 160 s of headless-Chromium wall clock at 16× speed. The policy holds the cube and
+rotates it for the whole run — it never drops.
 
 ## What the mjswan patch adds
 
@@ -36,7 +36,8 @@ uv pip install -e ./mjswan "mjlab==1.5.3"
 
 python export_leap_policy.py     # ckpt -> leap_actor.onnx (320 -> 16)
 python build_leap_demo.py        # -> dist-leap/
-python capture_leap.py --seconds 90   # headless run + video
+python capture_leap.py --seconds 150   # headless run -> video/*.webm
+python make_gif.py --seconds 10       # -> leap_inhand_rotation.gif
 ```
 
 `leap_compat.py` and the upstream clone are expected beside these scripts.
@@ -50,6 +51,7 @@ python capture_leap.py --seconds 90   # headless run + video
 | `export_leap_policy.py` | Actor + empirical normalizer → ONNX, checked against PyTorch. |
 | `build_leap_demo.py` | `Builder` → `add_scene_mjlab` → `add_policy` → `dist-leap/`. |
 | `capture_leap.py` | Serves the build with COOP/COEP, drives it in Chromium, records video. |
+| `make_gif.py` | webm → GIF of a target length. Playwright's bundled ffmpeg muxes only webm, so ffmpeg decodes to PNGs and Pillow does the palette. |
 
 ## The one fidelity gap
 
