@@ -14,6 +14,7 @@ import sys
 from pathlib import Path
 
 import mjlab.actuator as _actuator
+import mjlab.terrains as _terrains
 import mjlab.utils.os as _mjlab_os
 from mjlab.actuator import IdealPdActuatorCfg
 
@@ -73,5 +74,10 @@ def install() -> None:
         _actuator.DelayedActuatorCfg = _delayed_actuator_cfg  # type: ignore[attr-defined]
     if not hasattr(_mjlab_os, "update_assets"):
         _mjlab_os.update_assets = _update_assets  # type: ignore[attr-defined]
+    # Only needed to import the repo's *task* package, whose `__init__` walks every
+    # config module. The robot definition alone does not touch it. `TerrainImporterCfg`
+    # became `TerrainEntityCfg` in mjlab 1.2.
+    if not hasattr(_terrains, "TerrainImporterCfg"):
+        _terrains.TerrainImporterCfg = _terrains.TerrainEntityCfg  # type: ignore[attr-defined]
     if str(IN_HAND_SRC) not in sys.path:
         sys.path.insert(0, str(IN_HAND_SRC))

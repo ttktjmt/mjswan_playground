@@ -34,6 +34,9 @@ def main() -> None:
         # The task's own group, restated with per-term look-back: the env config keeps
         # mjlab's group-level `history_length` so the tracer can build a live env.
         observations=leap_inhand_task.mjswan_actor_group(),
+        # Not the env config's term: that one is upstream's Python class, which exists
+        # only to give the tracer a live env. The browser runs mjswan's.
+        actions={"joint_pos": leap_inhand_task.mjswan_action_cfg()},
         policy_joint_names=leap_inhand_task.policy_joint_names(),
         default_joint_pos=leap_inhand_task.default_joint_pos(),
         default=True,

@@ -42,6 +42,7 @@ from mjlab.managers.observation_manager import (  # noqa: E402
     ObservationTermCfg as MjlabObsTermCfg,
 )
 from mjlab.managers.scene_entity_config import SceneEntityCfg  # noqa: E402
+from mjlab.managers.event_manager import EventTermCfg  # noqa: E402
 from mjlab.managers.termination_manager import TerminationTermCfg  # noqa: E402
 from mjlab.rl import (  # noqa: E402
     RslRlModelCfg,
@@ -55,6 +56,9 @@ from mjlab.viewer import ViewerConfig  # noqa: E402
 
 from mjlab.envs.mdp.actions import (  # noqa: E402
     RelativeJointPositionActionCfg,
+)
+from mjswan.envs.mdp.actions import (  # noqa: E402
+    RelativeJointPositionActionCfg as MjswanRelativeJointPositionActionCfg,
 )
 from mjswan.managers.observation_manager import (  # noqa: E402
     ObservationGroupCfg,
@@ -83,8 +87,24 @@ DELTA_PER_STEP = 1.0 / 24.0
 #: chronological, so the 10 look-back offsets run 9 -> 0.
 HISTORY_STEPS = tuple(range(9, -1, -1))
 
+#: `EntityArticulationInfoCfg.soft_joint_pos_limit_factor` on the LEAP hand: the
+#: integrated target is clamped to the joint range shrunk by this about its midpoint.
+SOFT_JOINT_POS_LIMIT_FACTOR = 0.95
+
 #: `object_fallen` / `cube_fell` in the upstream config.
 CUBE_MIN_HEIGHT = 0.2
+
+#: `GRASP_INIT_JOINT_POS` from upstream's leap_left_custom config. The hand starts here
+#: on every episode and — this is the part that matters — `joint_pos_rel` subtracts it.
+#: Upstream's grasp-cache reset writes the *cube's* size and pose and nothing else
+#: ("Robot joints are not touched"), so the cache's own recorded hand pose is not the
+#: reference the policy was trained against.
+GRASP_INIT_JOINT_POS: dict[str, float] = {
+    "if_mcp": 0.1, "if_rot": 0.4, "if_pip": 1.3, "if_dip": 0.0,
+    "mf_mcp": 0.1, "mf_rot": 0.0, "mf_pip": 1.3, "mf_dip": 0.0,
+    "rf_mcp": 0.1, "rf_rot": -0.4, "rf_pip": 1.3, "rf_dip": 0.0,
+    "th_cmc": 1.45, "th_axl": -1.5, "th_mcp": 0.579, "th_ipl": 1.37,
+}
 
 
 def joint_pos_commanded(
@@ -115,6 +135,9 @@ def _grasp(cube_size: float = 0.0375) -> dict:
             "joint_names": [str(n) for n in cache["joint_names"]],
             "joint_pos": cache["joint_pos"][index].astype(float),
             "cube_pose": cache["cube_pose_rel"][index].astype(float),
+            # The hand pose the grasp settled into. Recorded for reference only: the
+            # reset never writes it, so it is not the policy's `default_joint_pos`.
+            "settled_joint_pos": cache["joint_pos"][index].astype(float),
             "cube_size": float(sizes[index]),
             "index": index,
         }
@@ -167,17 +190,62 @@ def _cube_spec_fn(size: float, mass: float = 0.1):
     return get_cube_spec
 
 
-def make_env_cfg() -> ManagerBasedRlEnvCfg:
+def _upstream_delta_action_cfg():
+    """Upstream's `JointPositionDeltaActionCfg`, loaded straight from its file.
+
+    Not `from in_hand_rotation_mjlab.tasks…import`: the task package's `__init__` walks
+    every config module, and those still call the mjlab v1.1 domain-randomization API.
+    The action module itself imports nothing from its own package, so a file-path load
+    gets the real class with no shims at all.
+    """
+    import importlib.util
+    import sys
+
+    path = (
+        leap_compat.IN_HAND_SRC
+        / "in_hand_rotation_mjlab/tasks/hand_cube/mdp/actions.py"
+    )
+    spec = importlib.util.spec_from_file_location("_upstream_hand_cube_actions", path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    # `@dataclass` resolves annotations through `sys.modules[cls.__module__]`, so the
+    # module has to be registered before its body runs.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module.JointPositionDeltaActionCfg
+
+
+def _action_cfg(kind: str):
+    """`relative` is mjlab's own term; `integrator` is upstream's, which is what the
+    policy was trained with. See `mjswan_action_cfg` for the browser side."""
+    if kind == "relative":
+        return RelativeJointPositionActionCfg(
+            entity_name=ENTITY, actuator_names=(".*",), scale=DELTA_PER_STEP
+        )
+    if kind == "integrator":
+        JointPositionDeltaActionCfg = _upstream_delta_action_cfg()
+        return JointPositionDeltaActionCfg(
+            entity_name=ENTITY,
+            actuator_names=(".*",),
+            scale=1.0,
+            offset=0.0,
+            use_default_offset=False,
+            clip_to_joint_limits=True,
+            use_soft_joint_pos_limits=True,
+            delta_min=-DELTA_PER_STEP,
+            delta_max=DELTA_PER_STEP,
+            interpolate_decimation=True,
+        )
+    raise ValueError(f"unknown action kind {kind!r}")
+
+
+def make_env_cfg(action: str = "integrator") -> ManagerBasedRlEnvCfg:
     from in_hand_rotation_mjlab.robots import get_leap_left_custom_hand_cfg
 
     grasp = _grasp()
 
     robot_cfg = get_leap_left_custom_hand_cfg()
-    # The grasp the cube pose was recorded against — not the open-hand home pose.
-    robot_cfg.init_state.joint_pos = {
-        name: float(value)
-        for name, value in zip(grasp["joint_names"], grasp["joint_pos"])
-    }
+    robot_cfg.init_state.joint_pos = dict(GRASP_INIT_JOINT_POS)
 
     cube_pose = grasp["cube_pose"]
     cube_cfg = EntityCfg(
@@ -201,11 +269,39 @@ def make_env_cfg() -> ManagerBasedRlEnvCfg:
         ),
     }
 
-    actions = {
-        "joint_pos": RelativeJointPositionActionCfg(
-            entity_name=ENTITY,
-            actuator_names=(".*",),
-            scale=DELTA_PER_STEP,
+    actions = {"joint_pos": _action_cfg(action)}
+
+    # mjlab applies an entity's `init_state` through reset *events*, not automatically:
+    # with no events the hand sits at all-zero joints and the cube at the world origin.
+    # Upstream's three, with every randomisation range zeroed — the browser runs one
+    # environment and shows the nominal grasp.
+    events = {
+        "reset_base": EventTermCfg(
+            func=envs_mdp.reset_root_state_uniform,
+            mode="reset",
+            params={
+                "pose_range": {},
+                "velocity_range": {},
+                "asset_cfg": SceneEntityCfg(ENTITY),
+            },
+        ),
+        "reset_robot_joints": EventTermCfg(
+            func=envs_mdp.reset_joints_by_offset,
+            mode="reset",
+            params={
+                "position_range": (0.0, 0.0),
+                "velocity_range": (0.0, 0.0),
+                "asset_cfg": SceneEntityCfg(ENTITY, joint_names=(".*",)),
+            },
+        ),
+        "reset_cube_pose": EventTermCfg(
+            func=envs_mdp.reset_root_state_uniform,
+            mode="reset",
+            params={
+                "pose_range": {},
+                "velocity_range": {},
+                "asset_cfg": SceneEntityCfg(OBJECT),
+            },
         ),
     }
 
@@ -229,7 +325,7 @@ def make_env_cfg() -> ManagerBasedRlEnvCfg:
         observations=observations,
         actions=actions,
         commands={},
-        events={},
+        events=events,
         rewards={},
         terminations=terminations,
         curriculum={},
@@ -305,20 +401,36 @@ def policy_joint_names() -> list[str]:
 
 
 def default_joint_pos() -> list[float]:
-    """The grasp the episode starts from, in `JOINT_ORDER`."""
-    grasp = _grasp()
-    by_name = dict(zip(grasp["joint_names"], grasp["joint_pos"]))
-    return [float(by_name[name]) for name in JOINT_ORDER]
+    """The pose `joint_pos_rel` is relative to, in `JOINT_ORDER`."""
+    return [GRASP_INIT_JOINT_POS[name] for name in JOINT_ORDER]
 
 
-def register() -> str:
+def mjswan_action_cfg() -> MjswanRelativeJointPositionActionCfg:
+    """The browser's action term.
+
+    `relative_to="command"` because that is the controller the policy was trained with:
+    the target integrates on its own previous command. mjlab's own measured-position
+    form is a different controller and, measured against this policy, does not rotate
+    the cube at all (0.001 rad/s over 400 steps, against 0.305 for the integrator).
+    """
+    return MjswanRelativeJointPositionActionCfg(
+        entity_name=ENTITY,
+        actuator_names=(".*",),
+        scale=DELTA_PER_STEP,
+        relative_to="command",
+        clip_to_joint_limits=True,
+        soft_joint_pos_limit_factor=SOFT_JOINT_POS_LIMIT_FACTOR,
+        interpolate_decimation=True,
+    )
+
+
+def register(action: str = "integrator") -> str:
     from mjlab.tasks.registry import register_mjlab_task
 
-    env_cfg = make_env_cfg()
     register_mjlab_task(
         task_id=TASK_ID,
-        env_cfg=env_cfg,
-        play_env_cfg=make_env_cfg(),
+        env_cfg=make_env_cfg(action),
+        play_env_cfg=make_env_cfg(action),
         rl_cfg=make_rl_cfg(),
     )
     return TASK_ID

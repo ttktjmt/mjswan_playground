@@ -39,10 +39,10 @@ index c1e09ba..0e9414f 100644
      "MuscleActivationActionCfg",
      "TendonLengthActionCfg",
 diff --git a/src/mjswan/envs/mdp/actions/actions.py b/src/mjswan/envs/mdp/actions/actions.py
-index 45af0e0..3241f6d 100644
+index 45af0e0..362edd2 100644
 --- a/src/mjswan/envs/mdp/actions/actions.py
 +++ b/src/mjswan/envs/mdp/actions/actions.py
-@@ -187,6 +187,48 @@ class ReferenceJointPositionActionCfg(BaseActionCfg):
+@@ -187,6 +187,87 @@ class ReferenceJointPositionActionCfg(BaseActionCfg):
          return entry
  
  
@@ -58,7 +58,32 @@ index 45af0e0..3241f6d 100644
 +    ``offset`` has no meaning when the base is the live position, and mjlab refuses a
 +    non-zero one; so does this. ``clip`` bounds the *delta* before it is added, which
 +    is where mjlab applies it for this term and nowhere else.
++
++    ``relative_to="command"`` switches the base from the measured position to the term's
++    own previous command, making it an integrator. That variant is **not** mjlab
++    parity — mjlab has only the measured-position form — but it is the standard delta
++    controller in dexterous manipulation (HORA, LEAPSim), and the two are not
++    interchangeable: under contact the measurement lags the command, so an integrator
++    can hold a target the measured-position form can never reach.
 +    """
++
++    relative_to: str = "position"
++    """``"position"`` for mjlab's ``q_cmd = q + scale·a``; ``"command"`` for
++    ``q_cmd += scale·a``, which carries state across control steps."""
++
++    clip_to_joint_limits: bool = True
++    """Clamp the target to the joint limits. Only meaningful for ``"command"``: an
++    integrator with no bound drifts past the joint stop and never comes back."""
++
++    soft_joint_pos_limit_factor: float | None = None
++    """mjlab's ``EntityArticulationInfoCfg.soft_joint_pos_limit_factor``, which shrinks
++    each joint's range about its midpoint. The browser derives the limits from its own
++    model's ``jnt_range``, so only the factor has to travel. ``None`` uses the hard
++    limits."""
++
++    interpolate_decimation: bool = False
++    """Ramp the setpoint linearly across the decimation substeps instead of stepping to
++    it at once. Smooths the torque, as mjlab's own actuator delay does."""
 +
 +    stiffness: float | list[float] | dict[str, float] | None = None
 +    """Position gain (kp). mjswan-specific; see :class:`JointPositionActionCfg`."""
@@ -75,11 +100,25 @@ index 45af0e0..3241f6d 100644
 +                "`current_pos + scale * a`, so a fixed offset has no meaning. mjlab "
 +                "raises the same error in its own `__post_init__`."
 +            )
++        if self.relative_to not in ("position", "command"):
++            raise ValueError(
++                f"relative_to must be 'position' or 'command', got "
++                f"{self.relative_to!r}."
++            )
 +
 +        entry: dict[str, Any] = {"type": "joint_position_relative"}
 +        if self.scale != 1.0:
 +            entry["scale"] = self.scale
 +        entry["actuator_names"] = list(self.actuator_names)
++        entry["relative_to"] = self.relative_to
++        if self.relative_to == "command":
++            entry["clip_to_joint_limits"] = self.clip_to_joint_limits
++            if self.soft_joint_pos_limit_factor is not None:
++                entry["soft_joint_pos_limit_factor"] = float(
++                    self.soft_joint_pos_limit_factor
++                )
++            if self.interpolate_decimation:
++                entry["interpolate_decimation"] = True
 +        if self.stiffness is not None:
 +            entry["stiffness"] = self.stiffness
 +        if self.damping is not None:
@@ -92,10 +131,20 @@ index 45af0e0..3241f6d 100644
  class JointVelocityActionCfg(BaseActionCfg):
      """Configuration for joint velocity control.
 diff --git a/src/mjswan/template/src/core/action/__tests__/applyAction.test.ts b/src/mjswan/template/src/core/action/__tests__/applyAction.test.ts
-index b913f7d..5769258 100644
+index b913f7d..a649270 100644
 --- a/src/mjswan/template/src/core/action/__tests__/applyAction.test.ts
 +++ b/src/mjswan/template/src/core/action/__tests__/applyAction.test.ts
-@@ -385,3 +385,99 @@ describe('readClipActions / clampActions', () => {
+@@ -9,7 +9,9 @@ import { describe, expect, it, vi } from 'vitest';
+ 
+ import {
+   applyAction,
++  beginControlStep,
+   clampActions,
++  resetActionTerms,
+   readClipActions,
+   resolveActionClip,
+   stepPhysics,
+@@ -385,3 +387,206 @@ describe('readClipActions / clampActions', () => {
      warn.mockRestore();
    });
  });
@@ -195,8 +244,115 @@ index b913f7d..5769258 100644
 +    expect(out[1]).toBeCloseTo(0.8, 6);
 +  });
 +});
++
++describe('applyAction — joint_position_relative, relative_to: command', () => {
++  /** An integrating term over two joints, seeded empty. */
++  function integrator(over: Partial<ResolvedActionTerm> = {}): ResolvedActionTerm {
++    return term({
++      controlType: 'joint_position_relative',
++      relativeTo: 'command',
++      commandTarget: new Float32Array(2),
++      prevCommandTarget: new Float32Array(2),
++      substep: 0,
++      decimation: 1,
++      actionScale: Float32Array.from([0.25, 0.25]),
++      limitLo: Float32Array.from([-Infinity, -Infinity]),
++      limitHi: Float32Array.from([Infinity, Infinity]),
++      ...over,
++    });
++  }
++
++  it('accumulates across control steps instead of following the position', () => {
++    const data = fakeData(2, [0.3, -0.1]);
++    const t = integrator();
++    resetActionTerms(data, [t]);
++    expect(t.commandTarget![0]).toBeCloseTo(0.3, 6);
++    expect(t.commandTarget![1]).toBeCloseTo(-0.1, 6);
++
++    for (let step = 0; step < 3; step++) {
++      beginControlStep(data, [t], Float32Array.from([1, -1]));
++      applyAction(data, [t], Float32Array.from([1, -1]));
++    }
++    // Three steps of +/-0.25 from the seed, regardless of where the sim went.
++    expect(t.commandTarget![0]).toBeCloseTo(0.3 + 0.75, 6);
++    expect(t.commandTarget![1]).toBeCloseTo(-0.1 - 0.75, 6);
++    expect(data.ctrl[0]).toBeCloseTo(1.05, 6);
++  });
++
++  it('advances once per control step, not once per substep', () => {
++    // The bug this guards: `applyAction` runs `decimation` times per control step, so
++    // integrating there would multiply the delta by the decimation.
++    const data = fakeData(2, [0, 0]);
++    const t = integrator({ decimation: 10 });
++    resetActionTerms(data, [t]);
++
++    beginControlStep(data, [t], Float32Array.from([1, 0]));
++    for (let substep = 0; substep < 10; substep++) {
++      applyAction(data, [t], Float32Array.from([1, 0]));
++    }
++    expect(t.commandTarget![0]).toBeCloseTo(0.25, 6);
++  });
++
++  it('clamps the integrated target to the joint limits', () => {
++    const data = fakeData(2, [0, 0]);
++    const t = integrator({
++      limitLo: Float32Array.from([-0.4, -0.4]),
++      limitHi: Float32Array.from([0.4, 0.4]),
++    });
++    resetActionTerms(data, [t]);
++    for (let step = 0; step < 10; step++) {
++      beginControlStep(data, [t], Float32Array.from([1, -1]));
++    }
++    // Ten steps of 0.25 would reach 2.5 unbounded; an integrator with no bound walks
++    // straight through the joint stop and never comes back.
++    expect(t.commandTarget![0]).toBeCloseTo(0.4, 6);
++    expect(t.commandTarget![1]).toBeCloseTo(-0.4, 6);
++  });
++
++  it('ramps the setpoint across substeps when interpolating', () => {
++    const data = fakeData(2, [0, 0]);
++    const t = integrator({ decimation: 4, interpolateDecimation: true });
++    resetActionTerms(data, [t]);
++    beginControlStep(data, [t], Float32Array.from([1, 0]));
++
++    const seen: number[] = [];
++    for (let substep = 0; substep < 4; substep++) {
++      applyAction(data, [t], Float32Array.from([1, 0]));
++      seen.push(data.ctrl[0]);
++    }
++    // Quarter, half, three-quarters, all of the way to 0.25.
++    expect(seen.map(v => Number(v.toFixed(6)))).toEqual([0.0625, 0.125, 0.1875, 0.25]);
++  });
++
++  it('re-seeds from the current position on reset', () => {
++    const data = fakeData(2, [0, 0]);
++    const t = integrator();
++    resetActionTerms(data, [t]);
++    beginControlStep(data, [t], Float32Array.from([1, 1]));
++    expect(t.commandTarget![0]).toBeCloseTo(0.25, 6);
++
++    // A new episode starts the hand somewhere else; the target must follow it, or the
++    // first command yanks every joint back to the old episode's pose.
++    data.qpos[0] = 1.2;
++    data.qpos[1] = -0.8;
++    resetActionTerms(data, [t]);
++    expect(t.commandTarget![0]).toBeCloseTo(1.2, 6);
++    expect(t.commandTarget![1]).toBeCloseTo(-0.8, 6);
++    expect(t.substep).toBe(0);
++  });
++
++  it('leaves a relative_to: position term stateless', () => {
++    const data = fakeData(2, [0.3, -0.1]);
++    const t = term({ controlType: 'joint_position_relative', relativeTo: 'position' });
++    resetActionTerms(data, [t]);
++    beginControlStep(data, [t], Float32Array.from([1, 1]));
++    expect(t.commandTarget ?? null).toBeNull();
++    applyAction(data, [t], Float32Array.from([0.5, 0.5]));
++    expect(Array.from(data.ctrl)).toEqual([0.8, 0.4]);
++  });
++})
 diff --git a/src/mjswan/template/src/core/action/applyAction.ts b/src/mjswan/template/src/core/action/applyAction.ts
-index b6a43d8..42013b7 100644
+index b6a43d8..bb7aa4f 100644
 --- a/src/mjswan/template/src/core/action/applyAction.ts
 +++ b/src/mjswan/template/src/core/action/applyAction.ts
 @@ -12,6 +12,7 @@ type MjData = import('mujoco').MjData;
@@ -207,7 +363,7 @@ index b6a43d8..42013b7 100644
    | 'joint_position_reference'
    | 'torque'
    | 'muscle_activation';
-@@ -34,6 +35,13 @@ export interface ResolvedActionTerm {
+@@ -34,6 +35,32 @@ export interface ResolvedActionTerm {
     * stands in — a still robot rather than one folded into zeros.
     */
    referenceJointPos?: Float32Array | null;
@@ -218,10 +374,29 @@ index b6a43d8..42013b7 100644
 +   * Pre-encoder-bias, as `set_joint_position_target` receives it in mjlab.
 +   */
 +  jointPosTargetOut?: Float32Array | null;
++  /**
++   * `joint_position_relative` only. `'position'` is mjlab's own semantics — the target
++   * is re-based on the measured position every step, so the term is stateless.
++   * `'command'` integrates on the previous command instead, which carries state.
++   */
++  relativeTo?: 'position' | 'command';
++  /** `'command'` only: the running target, in this term's joint order. */
++  commandTarget?: Float32Array | null;
++  /** `'command'` only: the target at the start of this control step, for interpolation. */
++  prevCommandTarget?: Float32Array | null;
++  /** `'command'` only: which substep of the control step `applyAction` is serving. */
++  substep?: number;
++  /** Substeps per control step, so interpolation knows the ramp length. */
++  decimation?: number;
++  /** `'command'` only: ramp the setpoint across the substeps instead of stepping. */
++  interpolateDecimation?: boolean;
++  /** Joint position bounds the integrated target is clamped to; ±Infinity if unbounded. */
++  limitLo?: Float32Array | null;
++  limitHi?: Float32Array | null;
    encoderBias: Float32Array;
    /**
     * Per-actuator: true = position (`biastype=affine`), so `ctrl` is a target and MuJoCo
-@@ -92,19 +100,32 @@ function applyActionTerm(
+@@ -92,19 +119,50 @@ function applyActionTerm(
    const numJoints = ctrlAdr.length;
    const ctrl = mjData.ctrl;
  
@@ -233,24 +408,42 @@ index b6a43d8..42013b7 100644
 +  ) {
      const reference = term.referenceJointPos ?? null;
 +    const relative = controlType === 'joint_position_relative';
++    const integrating = relative && term.relativeTo === 'command';
 +    const targetOut = term.jointPosTargetOut ?? null;
      for (let i = 0; i < numJoints; i++) {
        const ctrlIndex = ctrlAdr[i];
        if (ctrlIndex < 0) continue;
        const actionValue = actions[actionIndices[i]] ?? 0;
 -      const base = reference ? (reference[actionIndices[i]] ?? 0) : defaultJointPos[i];
-+      // Relative re-bases on the live position and clamps the *delta*, which is where
-+      // mjlab applies `clip` for this term; the others clamp the finished target.
-+      const processed = relative
-+        ? mjData.qpos[qposAdr[i]] +
-+          clamp(actionScale[i] * actionValue, term.clipLo[i], term.clipHi[i])
-+        : clamp(
-+            (reference ? (reference[actionIndices[i]] ?? 0) : defaultJointPos[i]) +
-+              actionOffset[i] +
-+              actionScale[i] * actionValue,
-+            term.clipLo[i],
-+            term.clipHi[i],
-+          );
++      // Three bases for the same arithmetic. `command` is the one that carries state:
++      // its target was advanced once, in `beginControlStep`, and is only *read* here —
++      // integrating in this function would advance it once per substep instead.
++      let processed: number;
++      if (integrating) {
++        const target = term.commandTarget?.[i] ?? 0;
++        if (term.interpolateDecimation) {
++          const previous = term.prevCommandTarget?.[i] ?? target;
++          const steps = Math.max(1, term.decimation ?? 1);
++          const alpha = Math.min(1, ((term.substep ?? 0) + 1) / steps);
++          processed = previous + alpha * (target - previous);
++        } else {
++          processed = target;
++        }
++      } else if (relative) {
++        // Re-based on the live position, clamping the *delta* — which is where mjlab
++        // applies `clip` for this term; the others clamp the finished target.
++        processed =
++          mjData.qpos[qposAdr[i]] +
++          clamp(actionScale[i] * actionValue, term.clipLo[i], term.clipHi[i]);
++      } else {
++        processed = clamp(
++          (reference ? (reference[actionIndices[i]] ?? 0) : defaultJointPos[i]) +
++            actionOffset[i] +
++            actionScale[i] * actionValue,
++          term.clipLo[i],
++          term.clipHi[i],
++        );
++      }
 +      if (targetOut) targetOut[qposAdr[i]] = processed;
        // Un-bias the target: the policy was trained against a biased reading.
 -      const processed = clamp(
@@ -261,11 +454,102 @@ index b6a43d8..42013b7 100644
        const target = processed - encoderBias[i];
  
        if (positionActuator[i]) {
+@@ -115,6 +173,7 @@ function applyActionTerm(
+         ctrl[ctrlIndex] = kp[i] * (target - qpos) + kd[i] * (0 - qvel);
+       }
+     }
++    if (integrating) term.substep = (term.substep ?? 0) + 1;
+     return;
+   }
+ 
+@@ -225,6 +284,66 @@ export function clampActions(action: Float32Array, bound: number | null): void {
+   }
+ }
+ 
++/**
++ * Advance the integrating terms by one control step, before any substep runs.
++ *
++ * Separate from `applyAction` because that is called once per *substep*: integrating
++ * there would advance the target `decimation` times per policy step. This mirrors
++ * mjlab's split between `process_actions` (once) and `apply_actions` (per substep).
++ */
++export function beginControlStep(
++  mjData: MjData,
++  terms: readonly ResolvedActionTerm[],
++  actions: Float32Array,
++): void {
++  for (const term of terms) {
++    if (term.controlType !== 'joint_position_relative') continue;
++    if (term.relativeTo !== 'command') continue;
++    const target = term.commandTarget;
++    if (!target) continue;
++    term.prevCommandTarget?.set(target);
++    term.substep = 0;
++    for (let i = 0; i < target.length; i++) {
++      const delta = clamp(
++        term.actionScale[i] * (actions[term.actionIndices[i]] ?? 0),
++        term.clipLo[i],
++        term.clipHi[i],
++      );
++      target[i] = clamp(
++        target[i] + delta,
++        term.limitLo?.[i] ?? -Infinity,
++        term.limitHi?.[i] ?? Infinity,
++      );
++    }
++  }
++}
++
++/**
++ * Seed each integrating term from the current joint positions, as mjlab's
++ * `_initialize_target` does on reset. Without this the first episode starts the
++ * integrator at zero and the hand snaps to the joint stops.
++ */
++export function resetActionTerms(
++  mjData: MjData,
++  terms: readonly ResolvedActionTerm[],
++): void {
++  for (const term of terms) {
++    if (term.controlType !== 'joint_position_relative') continue;
++    if (term.relativeTo !== 'command') continue;
++    const target = term.commandTarget;
++    if (!target) continue;
++    for (let i = 0; i < target.length; i++) {
++      target[i] = clamp(
++        mjData.qpos[term.qposAdr[i]] ?? 0,
++        term.limitLo?.[i] ?? -Infinity,
++        term.limitHi?.[i] ?? Infinity,
++      );
++    }
++    term.prevCommandTarget?.set(target);
++    term.substep = 0;
++  }
++}
++
+ /** `decimation` substeps, re-applying the action each time: a motor's PD reads live state. */
+ export function stepPhysics(
+   mujoco: { mj_step(model: MjModel, data: MjData): void },
+@@ -237,6 +356,7 @@ export function stepPhysics(
+   /** After the step, where mjlab's `scene.update(dt=physics_dt)` reads sensors. */
+   onSubstepEnd?: () => void,
+ ): void {
++  beginControlStep(mjData, terms, actions);
+   for (let substep = 0; substep < decimation; substep++) {
+     applyAction(mjData, terms, actions);
+     onSubstep?.();
 diff --git a/src/mjswan/template/src/core/engine/runtime.ts b/src/mjswan/template/src/core/engine/runtime.ts
-index 7f1375d..3b622f5 100644
+index 7f1375d..e74532a 100644
 --- a/src/mjswan/template/src/core/engine/runtime.ts
 +++ b/src/mjswan/template/src/core/engine/runtime.ts
-@@ -237,6 +237,13 @@ export class mjswanRuntime {
+@@ -29,6 +29,7 @@ import {
+   readClipActions,
+   resolveActionClip,
+   stepPhysics,
++  resetActionTerms,
+   type ResolvedActionTerm,
+ } from '../action/applyAction';
+ import { applyResetTerms } from './resetChain';
+@@ -237,6 +238,13 @@ export class mjswanRuntime {
    private raycastSensors: Record<string, RaycastSensorDescriptor> = {};
    /** Owned here, not by the slot reader: the history advances per substep. */
    private contactSensors = new ContactSensorSet();
@@ -279,7 +563,7 @@ index 7f1375d..3b622f5 100644
  
    constructor(mujoco: MainModule, container: HTMLElement, termSeed = DEFAULT_TERM_SEED) {
      this.mujoco = mujoco;
-@@ -260,6 +267,7 @@ export class mjswanRuntime {
+@@ -260,6 +268,7 @@ export class mjswanRuntime {
          jointBias: (name) => this.jointBias.get(name) ?? 0,
          raycastSensors: () => this.raycastSensors,
          contactSensors: () => this.contactSensors,
@@ -287,7 +571,7 @@ index 7f1375d..3b622f5 100644
        },
      );
  
-@@ -527,6 +535,10 @@ export class mjswanRuntime {
+@@ -527,6 +536,10 @@ export class mjswanRuntime {
  
        this.mujocoRoot = this.scene.getObjectByName('MuJoCo Root') as THREE.Group | null;
  
@@ -298,7 +582,58 @@ index 7f1375d..3b622f5 100644
        this.mujoco.mj_forward(this.mjModel, this.mjData);
        updateLightsFromData(this.mujoco, this.mjData, this.lights);
        updateHeadlightFromCamera(this.camera, this.lights);
-@@ -1019,6 +1031,7 @@ export class mjswanRuntime {
+@@ -906,6 +919,11 @@ export class mjswanRuntime {
+       const state = this.policyStateBuilder.build();
+       this.policyRunner.reset(state);
+       this.policyControl = this.buildPolicyControl(config, runner, this.policyStateBuilder);
++      // Attaching a policy mid-run does not go through `resetSimulationState`, so seed
++      // any integrating term here too — otherwise its target starts at zero.
++      if (this.policyControl && this.mjData) {
++        resetActionTerms(this.mjData, this.policyControl);
++      }
+ 
+       // Initialize termination manager if termination config is present
+       if (config.terminations && Object.keys(config.terminations).length > 0) {
+@@ -958,7 +976,10 @@ export class mjswanRuntime {
+       configStiffness: number[] | number | Record<string, number> | undefined,
+       configDamping: number[] | number | Record<string, number> | undefined,
+       useDefaultOffset: boolean,
+-      configClip?: Record<string, readonly number[]>
++      configClip?: Record<string, readonly number[]>,
++      relativeToRaw?: string,
++      softLimitFactor?: number,
++      interpolateDecimation = false
+     ) => {
+       const n = mapping.qposAdr.length;
+       const subsetJointNames = mapping.actionIndices.map((i) => jointNames[i]);
+@@ -1010,8 +1031,26 @@ export class mjswanRuntime {
+         `mode: ${isPosition ? 'position (ctrl=target_pos)' : 'motor (ctrl=torque, external PD)'}`
+       );
+ 
++      // `joint_position_relative` with `relative_to: "command"` is the one stateful
++      // term: it needs a running target and the bounds to keep it inside.
++      const relativeTo: 'position' | 'command' =
++        relativeToRaw === 'command' ? 'command' : 'position';
++      const integrating =
++        controlType === 'joint_position_relative' && relativeTo === 'command';
++      const { limitLo, limitHi } = integrating
++        ? this.jointLimits(mapping.qposAdr, softLimitFactor)
++        : { limitLo: null, limitHi: null };
++
+       return {
+         controlType,
++        relativeTo,
++        commandTarget: integrating ? new Float32Array(n) : null,
++        prevCommandTarget: integrating ? new Float32Array(n) : null,
++        substep: 0,
++        decimation: this.decimation,
++        interpolateDecimation: integrating && interpolateDecimation,
++        limitLo,
++        limitHi,
+         ctrlAdr: mapping.ctrlAdr,
+         qposAdr: mapping.qposAdr,
+         qvelAdr: mapping.qvelAdr,
+@@ -1019,6 +1058,7 @@ export class mjswanRuntime {
          actionScale,
          actionOffset,
          defaultJointPos,
@@ -306,7 +641,7 @@ index 7f1375d..3b622f5 100644
          encoderBias,
          positionActuator,
          kp,
-@@ -1065,6 +1078,7 @@ export class mjswanRuntime {
+@@ -1065,6 +1105,7 @@ export class mjswanRuntime {
        const controlType = actionTerm.type ?? 'joint_position';
        if (
          controlType !== 'joint_position' &&
@@ -314,16 +649,24 @@ index 7f1375d..3b622f5 100644
          controlType !== 'joint_position_reference' &&
          controlType !== 'torque' &&
          controlType !== 'muscle_activation'
-@@ -1105,6 +1119,8 @@ export class mjswanRuntime {
+@@ -1105,6 +1146,16 @@ export class mjswanRuntime {
            actionScale,
            actionOffset,
            defaultJointPos: new Float32Array(n),
 +          // A muscle actuator commands excitation, not a joint position target.
 +          jointPosTargetOut: null,
++          relativeTo: 'position' as const,
++          commandTarget: null,
++          prevCommandTarget: null,
++          substep: 0,
++          decimation: this.decimation,
++          interpolateDecimation: false,
++          limitLo: null,
++          limitHi: null,
            encoderBias: new Float32Array(n),
            positionActuator: new Array(n).fill(false),
            kp: new Float32Array(n),
-@@ -1145,6 +1161,8 @@ export class mjswanRuntime {
+@@ -1145,6 +1196,8 @@ export class mjswanRuntime {
        const useDefaultOffset = actionTerm.use_default_offset !== undefined
          ? actionTerm.use_default_offset
          : controlType === 'joint_position';
@@ -332,22 +675,74 @@ index 7f1375d..3b622f5 100644
  
        const entry = buildEntry(
          termKey,
-@@ -1154,7 +1172,7 @@ export class mjswanRuntime {
+@@ -1154,8 +1207,11 @@ export class mjswanRuntime {
          actionTerm.offset as number[] | number | Record<string, number> | undefined,
          actionTerm.stiffness as number[] | number | Record<string, number> | undefined,
          actionTerm.damping as number[] | number | Record<string, number> | undefined,
 -        useDefaultOffset,
+-        actionTerm.clip as Record<string, readonly number[]> | undefined
 +        relativeOffset,
-         actionTerm.clip as Record<string, readonly number[]> | undefined
++        actionTerm.clip as Record<string, readonly number[]> | undefined,
++        actionTerm.relative_to as string | undefined,
++        actionTerm.soft_joint_pos_limit_factor as number | undefined,
++        (actionTerm.interpolate_decimation as boolean | undefined) ?? false
        );
        if (controlType === 'joint_position_reference') {
-@@ -1234,6 +1252,9 @@ export class mjswanRuntime {
+         this.referenceActionCommands.set(entry, String(actionTerm.command_name ?? 'motion'));
+@@ -1170,6 +1226,41 @@ export class mjswanRuntime {
+     return results;
+   }
+ 
++  /**
++   * mjlab's `soft_joint_pos_limits` for the joints at `qposAdr`, derived from the
++   * model's own `jnt_range` — so only the factor has to come from the build.
++   *
++   * `mean ± 0.5 · range · factor`, and `±Infinity` for a joint MuJoCo marks unlimited
++   * (whose `jnt_range` is `[0, 0]`, which would otherwise pin the target to zero).
++   */
++  private jointLimits(
++    qposAdr: readonly number[],
++    factor?: number
++  ): { limitLo: Float32Array; limitHi: Float32Array } {
++    const n = qposAdr.length;
++    const limitLo = new Float32Array(n).fill(-Infinity);
++    const limitHi = new Float32Array(n).fill(Infinity);
++    const mjModel = this.mjModel;
++    if (!mjModel) return { limitLo, limitHi };
++
++    // qpos address -> joint id, for the non-free joints this term can target.
++    const jointOfQpos = new Map<number, number>();
++    for (let j = 0; j < mjModel.njnt; j++) jointOfQpos.set(mjModel.jnt_qposadr[j], j);
++
++    const scale = factor ?? 1.0;
++    for (let i = 0; i < n; i++) {
++      const joint = jointOfQpos.get(qposAdr[i]);
++      if (joint === undefined || !mjModel.jnt_limited[joint]) continue;
++      const lo = mjModel.jnt_range[joint * 2];
++      const hi = mjModel.jnt_range[joint * 2 + 1];
++      const mean = (lo + hi) / 2;
++      const range = hi - lo;
++      limitLo[i] = mean - 0.5 * range * scale;
++      limitHi[i] = mean + 0.5 * range * scale;
++    }
++    return { limitLo, limitHi };
++  }
++
+   private normalizeControlArray(
+     values: number[] | number | Record<string, number> | undefined,
+     length: number,
+@@ -1234,6 +1325,14 @@ export class mjswanRuntime {
      // With the sim state, as mjlab does: a force from before the reset would otherwise
      // keep an `illegal_contact` term firing.
      this.contactSensors.reset();
 +    // mjlab's `EntityData.reset` zeroes `joint_pos_target`; an observation reading it
 +    // on the first frame after a reset must not see the last episode's command.
 +    this.jointPosTarget?.fill(0);
++    // After the sim state is back, so the integrator seeds from the reset pose and not
++    // from wherever the previous episode ended.
++    if (this.policyControl && this.mjData) {
++      resetActionTerms(this.mjData, this.policyControl);
++    }
      // Reset with the sim state, not the terms: it reads nothing from the scene.
      if (this.onnxModule) {
        this.onnxInputDict = this.onnxModule.initInput();
