@@ -7,6 +7,7 @@ A collection of tasks built with [mjswan](https://github.com/ttktjmt/mjswan).
 | Task ID | Robot | Description | Link |
 |---------|-------|-------------|------|
 | [`husky-skater`](src/mjswan_playground/husky_skater/README.md) | Unitree G1 | Skateboarding under whole-body control ([HUSKY](https://husky-humanoid.github.io/), RSS 2026) | [WIP] |
+| [`pacman`](src/mjswan_playground/pacman/README.md) | Unitree G1 | Dodging thrown balls from a head depth camera, and the walk policy beside it ([PAC-MAN](https://lzyang2000.github.io/perceptive_cbf_rl/), 2026) | [WIP] |
 | [`wbc-g1`](src/mjswan_playground/wbc_g1/README.md) | Unitree G1 | One [wbc-mjlab](https://github.com/wbc-mjlab/wbc-mjlab) tracking policy over various motions | [WIP] |
 
 ## CLI

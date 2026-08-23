@@ -1162,7 +1162,7 @@ wheels = [
 
 [[package]]
 name = "mjswan"
-version = "0.9.1"
+version = "0.9.2b0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mujoco" },
@@ -1172,9 +1172,9 @@ dependencies = [
     { name = "typer" },
     { name = "wandb" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/13/87/f2554721a999ee3ade6857793d688e42b07b2c37b1488d7831417989bc96/mjswan-0.9.1.tar.gz", hash = "sha256:483cec580726203b5812da62936b7631e5ad33c4f0f3e3467b3ae4fe16aabe91", size = 23136665, upload-time = "2026-08-18T02:25:00.478Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6c/54/bedcedfdf5ff185f0ee5813c5840f05841a713308b52d5d6893de6d9220c/mjswan-0.9.2b0.tar.gz", hash = "sha256:62fa944197da3784330aaa597ea07376b26c9cee2819956a5018fa7c2d9a638a", size = 23141470, upload-time = "2026-08-23T07:06:06.126Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bd/0c/838046b0dc245fcf997e3d6774f81857ae6df5169763beb39dab46589286/mjswan-0.9.1-py3-none-any.whl", hash = "sha256:e3929199c026a0ad84e7cab4d56ba6acc5002a7ef4d3eaabcf24ef25f76585fa", size = 23442403, upload-time = "2026-08-18T02:24:57.528Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/37/ddad64bc482b22816d2d12ea2548eee48ae8e96544f994489ef372df6cad/mjswan-0.9.2b0-py3-none-any.whl", hash = "sha256:7310d0fd68227ed3767a5584ddaf2507ee0ea19cf9b9c2d50e905f87492159b5", size = 23446944, upload-time = "2026-08-23T07:06:03.451Z" },
 ]
 
 [[package]]
@@ -1204,7 +1204,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "mjlab", specifier = "==1.5.3" },
-    { name = "mjswan", specifier = ">=0.9.1" },
+    { name = "mjswan", specifier = ">=0.9.2b0" },
     { name = "onnx", specifier = ">=1.20.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "torch", specifier = ">=2.9.1" },

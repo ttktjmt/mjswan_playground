@@ -9,7 +9,12 @@ authors = [{ name = "mjswan Developers" }]
 # pre-built wheel for 3.13+.
 requires-python = ">=3.10, <3.13"
 dependencies = [
-    "mjswan>=0.9.1",
+    # ponytail: bump to >=0.9.2 (and relock) once the stable release ships. The beta is
+    # what the `pacman` task needs — the traced-term fidelity fixes in
+    # ttktjmt/mjswan#101: mjlab's observation history order, adapting a task's subclass of
+    # an mjlab observation group (whose absence fails the build), and the entity-scoped
+    # event write (whose absence throws the robot instead of the ball).
+    "mjswan>=0.9.2b0",
     "mjlab==1.5.3",
     "torch>=2.9.1",
     "onnx>=1.20.0",
