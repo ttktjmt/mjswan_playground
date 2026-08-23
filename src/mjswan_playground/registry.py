@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 
 _TASKS: dict[str, str] = {
     "husky-skater": "mjswan_playground.husky_skater.main",
+    "pacman": "mjswan_playground.pacman.main",
     "wbc-g1": "mjswan_playground.wbc_g1.main",
 }
 

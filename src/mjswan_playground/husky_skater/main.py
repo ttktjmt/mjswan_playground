@@ -31,8 +31,9 @@ ENTITY = "robot"
 CONTROL_DT = 0.02
 #: `G1SkaterManagerBasedRlEnvCfg.cycle_time`: seconds per push -> steer cycle.
 CYCLE_TIME = 6.0
-#: The group's `history_length=5`, oldest frame first — mjlab's history buffer is
-#: chronological, `history_length` would stack newest-first.
+#: The group's `history_length=5`, spelled out oldest frame first. Since mjswan 0.9.2 a
+#: count stacks that way too, so `history_length=5` would now say the same thing; naming
+#: the offsets keeps this task's bundle unchanged across that engine bump.
 HISTORY_STEPS = (4, 3, 2, 1, 0)
 
 
