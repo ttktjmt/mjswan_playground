@@ -20,16 +20,14 @@ WALK_POLICY_ONNX = "deploy/ckpts/walk_policy.onnx"
 
 CAMERA = "head_camera_single"
 COMMAND_NAME = "twist"
-#: The group a policy reads, and the group the dodge task renders its image into.
 ACTOR_GROUP = "actor"
 DEPTH_GROUP = "depth"
 DEPTH_TERM = "head_depth"
-#: The rendering camera sensor, which is what the browser cannot serve.
+#: The rendering camera sensor, which the browser cannot serve.
 CAMERA_SENSOR = "head_depth_single"
 BALL_GEOM = "ball_collision"
 
-#: Walking, not standing, is what the walk policy is here to show. Well inside the play
-#: config's own `lin_vel_x` range, which its sliders take verbatim.
+#: Walking, not standing. Inside the play config's own `lin_vel_x` range.
 DEFAULT_FORWARD_SPEED = 0.5
 
 #: Reference-state initialization from the AMP clips — see README.
@@ -51,8 +49,7 @@ _THROW_PARAMS = {
     "aim_noise_scale": "aim_noise",
     "lead_target": "lead_target",
 }
-#: Depth-term params this task reproduces itself; anything else upstream sets is domain
-#: randomization, which the browser's clean image does not have.
+#: Depth-term params this task reproduces; the rest is domain randomization.
 _DEPTH_KEYS = (
     "sensor_name",
     "near",
@@ -64,12 +61,7 @@ _DEPTH_KEYS = (
 
 
 def _depth_geometry(params: dict[str, Any]) -> dict[str, Any]:
-    """``near`` / ``far`` from upstream's own depth term.
-
-    Everything else it can carry is either already true here (``flatten``) or a
-    training-time perturbation of the image, and a silently ignored perturbation is a
-    policy fed something it was not shown. So refuse instead.
-    """
+    """``near`` / ``far`` from upstream's depth term; refuse what we cannot reproduce."""
     extra = {key: value for key, value in params.items() if key not in _DEPTH_KEYS}
     if any(extra.values()):
         raise ValueError(
@@ -88,11 +80,7 @@ def _depth_geometry(params: dict[str, Any]) -> dict[str, Any]:
 
 
 def _model_geometry(env_cfg: Any) -> dict[str, float]:
-    """The camera's field of view and the ball's radius, off the specs they live in.
-
-    A traced term is handed the simulation state, not the model behind it, so anything
-    model-derived has to be resolved here and baked into the graph as a constant.
-    """
+    """Camera fovy and ball radius off the specs — a traced term sees only state."""
     robot_spec = env_cfg.scene.entities["robot"].spec_fn()
     ball_spec = env_cfg.scene.entities["ball"].spec_fn()
     return {
@@ -107,15 +95,11 @@ def _strip_untraceable(env_cfg: Any) -> None:
         env_cfg.events.pop(name, None)
     for name in DROPPED_DODGE_TERMINATIONS:
         env_cfg.terminations.pop(name, None)
-    # The reset keeps parking the ball aside; its optional throw countdown is a
-    # `torch.randint` the tracer cannot record, and the interval event owns the timing now.
+    # Untraceable `torch.randint` countdown; the interval event owns the timing now.
     env_cfg.events["reset_dodge_state"].params["throw_interval_range"] = None
-    # The hit is the contact sensor's alone: the velocity-discontinuity fallback compares
-    # against the previous step's ball velocity, which it keeps on the env.
+    # Contact sensor only: the fallback needs the previous step's ball velocity.
     env_cfg.terminations["ball_hit"].params["delta_v_threshold"] = 0.0
-    # The rendering camera goes, and with it every group that reads it. Only the actor's
-    # is exported anyway, and the critic's belief gate asks the camera sensor for its
-    # index — so leaving those groups in fails the tracing env on a sensor that is gone.
+    # Drop the rendering camera and every group reading it; only the actor's ships.
     env_cfg.scene.sensors = tuple(
         sensor
         for sensor in (env_cfg.scene.sensors or ())
@@ -148,10 +132,7 @@ def _add_dodge_scene(project: mjswan.ProjectHandle, root, contract) -> None:
         params=throw_params,
     )
 
-    # One group, not two: the actor reads `("actor", "depth")` concatenated, and mjswan
-    # feeds one vector per ONNX input. Adapting upstream's own group keeps its terms and
-    # their order rather than restating them here; the image goes last, as the
-    # checkpoint's 384 + 576 layout has it.
+    # One group: the actor reads `("actor", "depth")` concatenated, image last.
     observations = adapt_observations(env_cfg.observations[ACTOR_GROUP])[
         DEFAULT_OBS_GROUP_KEY
     ]
@@ -166,11 +147,7 @@ def _add_dodge_scene(project: mjswan.ProjectHandle, root, contract) -> None:
         name="Link-CBF Dodge",
         policy=onnx.load(str(root / DODGE_POLICY_ONNX)),
         observations=observations,
-        # The three numbers the policy reads as its velocity command, held at zero and
-        # given no controls: that is the deployed dodge mode, which ignores the
-        # operator's velocity outright. Upstream's sim-play command — a goal tracker
-        # wrapped in a ball-avoiding CBF filter — is a training-time construct the
-        # hardware never runs. See README.
+        # Zero, no controls: deployed dodge ignores the operator. See README.
         commands={COMMAND_NAME: mjswan.ui_command([])},
         policy_joint_names=[f"robot/{name}" for name in contract.POLICY_JOINT_NAMES],
         default_joint_pos=[float(value) for value in contract.DEFAULT_POS],
@@ -210,7 +187,7 @@ def setup_builder() -> mjswan.Builder:
 
     builder = mjswan.Builder()
     project = builder.add_project(name="PAC-MAN")
-    # Dodging first: it is what the paper is about, and the scene the viewer opens on.
+    # Dodging first: it is the scene the viewer opens on.
     _add_dodge_scene(project, root, contract)
     _add_walk_scene(project, root, contract)
     return builder

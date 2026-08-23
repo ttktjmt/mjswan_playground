@@ -1,8 +1,4 @@
-"""Access to the PAC-MAN checkout both of this task's scenes build from.
-
-Three things come out of it: a pinned checkout, its mjlab task ids registered, and the
-frozen articulation contract its ONNX checkpoints were exported against.
-"""
+"""The PAC-MAN checkout: pinned clone, task ids registered, deployed contract."""
 
 from __future__ import annotations
 
@@ -19,9 +15,8 @@ REPO_COMMIT = "55c47eb32d8602f078fe0761e179e6b65d3656ac"
 
 #: Importing it registers every task the repo defines with mjlab's registry.
 TASK_PACKAGE = "src.tasks.amp_loco.config.g1"
-#: The frozen, mjlab-free copy of the trained articulation — joint order, rest pose,
-#: action scale and PD gains — that the ONNX checkpoints were exported against, and that
-#: upstream's own test re-derives from ``g1_constants.py`` on every run.
+#: Frozen articulation (joint order, rest pose, action scale, PD gains) the ONNX
+#: checkpoints were exported against.
 DEPLOY_CONSTANTS = "deploy/common/g1_deploy_constants.py"
 MARKER = "deploy/ckpts/walk_policy.onnx"
 
@@ -39,10 +34,8 @@ def resolve_root() -> Path:
 def register_tasks(root: Path) -> None:
     """Import upstream's task package so mjlab's registry knows its task ids.
 
-    The repo runs from source under the top-level name ``src`` — it is never installed —
-    so its root has to reach ``sys.path``, and reach it *first*: this repository has a
-    ``src/`` of its own, and a namespace package bound to that one answers every
-    ``src.*`` import upstream makes with nothing.
+    Upstream runs from source as top-level ``src``, so its root must come *first* on
+    ``sys.path`` — this repo has a ``src/`` of its own that would shadow it.
     """
     imported = sys.modules.get("src")
     if imported is not None:
@@ -59,12 +52,7 @@ def register_tasks(root: Path) -> None:
 
 
 def deployed_contract(root: Path) -> ModuleType:
-    """``DEPLOY_CONSTANTS``, loaded by path rather than imported.
-
-    It lives in a second uv project (Python 3.8, no mjlab) whose directory is not a
-    package, so there is no import path to it — and its bare module name would collide
-    with whatever else claims it.
-    """
+    """``DEPLOY_CONSTANTS``, loaded by path: its directory is not a package."""
     path = root / DEPLOY_CONSTANTS
     spec = importlib.util.spec_from_file_location("_pacman_deploy_constants", path)
     if spec is None or spec.loader is None:

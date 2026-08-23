@@ -1,17 +1,10 @@
 """The two terms the dodge task cannot take from upstream as they are. See ``README.md``.
 
-* :func:`ball_depth` — the ball-only masked depth image. Upstream renders depth and
-  segmentation from the head camera and keeps the ball's pixels; the browser has no such
-  render, and mjswan's slot reader serves entity fields, sensor windows and casts, not
-  rendered frames. With a fixed camera and one sphere that image *is* its ray-sphere
-  intersections, which is what upstream's own browser demo computes
-  (``web/src/depth.js`` on its ``web-demo`` branch).
-* :func:`throw_ball` — the launch. Upstream's throw is a ``mode="step"`` event holding a
-  per-env countdown; mjswan's event modes are startup / reset / interval. The launch
-  geometry here is upstream's, on the interval its own play config already throws at.
-
-:func:`add_camera_pose_sensors` is what makes the first one possible: two MuJoCo frame
-sensors on the camera, whose ``sensordata`` windows mjswan already knows how to serve.
+* :func:`ball_depth` — the browser has no render, so the image is ray-sphere
+  intersections instead (as upstream's own ``web-demo`` branch does).
+* :func:`throw_ball` — upstream's launch geometry, on an interval event: mjswan has no
+  ``mode="step"`` for its per-env countdown.
+* :func:`add_camera_pose_sensors` — frame sensors giving the term the camera pose.
 """
 
 from __future__ import annotations
@@ -22,9 +15,8 @@ import mujoco
 import torch
 from mjlab.envs.mdp import observations as obs_fns
 
-# `sample_uniform` has to be reachable as this module's own global: mjswan's build-time
-# RNG spy patches the term function's module globals to record what it draws, and a draw
-# it cannot see is baked into the graph as a constant — the same throw, every time.
+# `sample_uniform` must be a module global: mjswan's RNG spy patches these to record
+# draws, and an unseen draw is baked in as a constant — the same throw, every time.
 from mjlab.utils.lab_api.math import (
     quat_apply,
     quat_apply_inverse,
@@ -44,11 +36,8 @@ def add_camera_pose_sensors(
 ) -> None:
     """Add ``framepos`` / ``framequat`` sensors on ``camera_name``, in place.
 
-    Wrapping ``spec_fn`` is how upstream adds to this robot too (see its
-    ``camera_gimbal.add_camera_gimbal``). The sensors are the depth term's only route to
-    the camera pose: a camera's ``cam_xpos`` is not one of mjswan's slots, while a
-    sensor's ``sensordata`` window is — and reading the pose off the camera itself keeps
-    the mount offset and the +20° tilt where they belong, in the model.
+    The depth term's only route to the camera pose: ``cam_xpos`` is not an mjswan slot,
+    a sensor window is — and the model keeps the mount offset and +20° tilt.
     """
     inner_spec_fn = entity_cfg.spec_fn
 
@@ -78,17 +67,12 @@ def _pixel_rays(
 ) -> torch.Tensor:
     """Unit ray directions in the camera frame, one per sub-sample: ``[H*W*s*s, 3]``.
 
-    MuJoCo cameras look down their local -z with +x right and +y up, and ``fovy`` is the
-    *vertical* field of view, so the horizontal half-extent scales by the aspect ratio
-    (fovy 54 at 16:9 → hFOV ≈ 84.5°, the ZED Mini's). Row 0 is the top of the image and
-    the flattening is row-major, matching the ``[B, H*W]`` flatten upstream's
-    ``DepthImageObs`` hands the policy.
+    MuJoCo cameras look down -z, +x right, +y up; ``fovy`` is vertical, so the
+    horizontal half-extent scales by the aspect ratio. Row-major from the top.
 
-    ``subsample`` rays per pixel axis are min-pooled per pixel by the caller, because
-    that is what the deployed perception stack does: the ZED produces a full-resolution
-    depth map, EfficientTAM masks it, and the camera node min-pools it down to 9×16 — so
-    a ball smaller than one 9×16 cell still registers. One ray per pixel centre would
-    instead miss a 0.076 m ball until ~1.65 m, most of the reaction window gone.
+    The caller min-pools ``subsample`` rays per pixel axis, as the deployed stack does
+    (full-res ZED depth, masked, min-pooled to 9×16). One ray per pixel centre misses
+    a 0.076 m ball until ~1.65 m — most of the reaction window gone.
     """
     tan_v = math.tan(math.radians(fovy_deg) / 2.0)
     tan_h = tan_v * width / height
@@ -123,38 +107,30 @@ def ball_depth(
 ) -> torch.Tensor:
     """Ball-only masked depth, normalized to ``[0, 1]``: ``[B, height * width]``.
 
-    ``BallOnlyDepthObs`` keeps the ball's pixels at their depth and sets every other pixel
-    to ``far``; the camera is fixed and the ball is a sphere, so each pixel is a
-    ray-sphere intersection. The value is the **perpendicular** depth — the hit projected
-    onto the optical axis, not the distance along the ray. Measured against upstream's own
-    rendered frames, that is what the ``mujoco_warp`` sensor reports: median disagreement
-    0.017 m against 0.121 m for the ray distance, whose error grows with the pixel's angle
-    off the axis (up to 0.45 m at the edge of an 85° field of view). It is also what a
-    stereo camera's depth map carries, which is what the deployed policy reads.
-    Normalization is then upstream's ``depth_metres_to_obs``: a reading below ``near``
-    means "nothing there" and reads as ``far``, then clamp and scale.
+    Ball pixels carry their depth, every other pixel reads ``far``. The value is the
+    **perpendicular** depth (hit projected on the optical axis), which is what the
+    ``mujoco_warp`` sensor and a stereo depth map report — median disagreement 0.017 m
+    against 0.121 m for the ray distance. Normalization is upstream's
+    ``depth_metres_to_obs``: below ``near`` reads as ``far``, then clamp and scale.
 
-    Self-occlusion is not modelled — an arm in front of the ball segments as the arm in
-    training, so those pixels read ``far``, while here the ball stays visible. That only
-    ever hands the policy a cleaner view than training did, and it trained with per-pixel
-    and whole-ball dropout, so this stays inside the distribution rather than outside it.
-    Upstream's own browser demo makes the same trade, for the same reason.
+    Self-occlusion is not modelled, so the view is only ever cleaner than training's —
+    inside the distribution, given its per-pixel and whole-ball dropout.
 
-    ``fovy`` and ``ball_radius`` are the model's own, read off the specs at build time —
-    a traced term sees the simulation state, not the model it came from.
+    ``fovy`` and ``ball_radius`` are baked in at build time: a traced term sees state,
+    not the model.
     """
     cam_pos = obs_fns.builtin_sensor(env, sensor_name=pos_sensor)
     cam_quat = obs_fns.builtin_sensor(env, sensor_name=quat_sensor)
     ball_pos = env.scene[ball_name].data.root_link_pos_w
     rays = _pixel_rays(width, height, subsample, fovy, cam_pos.device)
 
-    # The ball's centre in the camera frame: one rotation, rather than one per ray.
+    # Ball centre in the camera frame: one rotation, not one per ray.
     centre = quat_apply_inverse(cam_quat, ball_pos - cam_pos)
     along = centre @ rays.transpose(0, 1)  # [B, N] centre projected on each ray
     offset = (centre * centre).sum(-1, keepdim=True) - ball_radius * ball_radius
     disc = along * along - offset
     root = torch.sqrt(disc.clamp(min=0.0))
-    # The near intersection, or the far one when the camera sits inside the sphere.
+    # Near intersection, or the far one when the camera sits inside the sphere.
     hit_near = along - root
     distance = torch.where(hit_near > 0.0, hit_near, along + root)
     empty = torch.full_like(distance, far)
@@ -187,13 +163,11 @@ def throw_ball(
 ) -> None:
     """Launch the ball at the robot, teleporting it to a fresh launch point.
 
-    Upstream's ``throw_ball_on_dwell``, minus the trigger: which step to fire on is the
-    event manager's business, and here that is an interval. The two threat types are
-    mixed as its play config mixes them, because the policy answers them differently — a
-    **descending** ball launched high with ``vz0 = 0`` falls across the body (sidestep, or
-    step over), and a **low-arc** ball launched low with an upward ``vz0`` chosen to arrive
-    at torso/head height has to be ducked. The launch point stays in the robot's frontal
-    cone so the head camera sees it; only the aim point is led and jittered.
+    Upstream's ``throw_ball_on_dwell`` minus the trigger (an interval event fires it).
+    Two threat types, mixed as its play config mixes them: a **descending** ball (high,
+    ``vz0 = 0``) falls across the body, a **low-arc** ball (low, upward ``vz0``) arrives
+    at torso height and must be ducked. Launch stays in the frontal cone so the head
+    camera sees it; only the aim point is led and jittered.
     """
     robot = env.scene[robot_name]
     ball = env.scene[ball_name]
@@ -218,15 +192,14 @@ def throw_ball(
         sample_uniform(*height_range, **draw),
     )
 
-    # Reaction window. A descending throw's flight is capped so the ball cannot fall
-    # below ~0.05 m before it arrives (it would land short); a low-arc throw rises first,
-    # so it uses the whole window.
+    # Cap a descending throw so it cannot fall below ~0.05 m before arriving; a low-arc
+    # throw rises first, so it uses the whole window.
     requested = sample_uniform(*flight_time_range, **draw)
     ceiling = torch.sqrt(2.0 * (start_z - 0.05).clamp(min=1e-3) / gravity)
     flight = torch.where(high, requested, torch.minimum(requested, ceiling))
 
-    # Aim: the robot's xy, led by its velocity so a robot walking a straight line does not
-    # walk out of the throw for free, then jittered so no two throws are identical.
+    # Aim at the robot's xy, led by its velocity so it cannot walk out of the throw, then
+    # jittered so no two throws are identical.
     target_xy = root_pos[:, :2]
     if lead_target:
         target_xy = target_xy + robot.data.root_link_lin_vel_w[:, :2] * flight
