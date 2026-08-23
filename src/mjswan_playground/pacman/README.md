@@ -28,7 +28,7 @@ uv run mjswan-playground run pacman
 The build clones the PAC-MAN repository into `.cache/` at a pinned commit; set
 `MJSWAN_PACMAN_ROOT` to point at a checkout you already have.
 
-Unlike [`husky-skater`](../husky_skater/README.md), this task **imports** upstream. The
+Unlike [`husky`](../husky/README.md), this task **imports** upstream. The
 scenes are not shipped XML — the robot, its collision geometry and the terrain are
 assembled in Python by the repo's own mjlab task configs — so the checkout goes on
 `sys.path` and `add_scene_mjlab` builds each scene from its registered task

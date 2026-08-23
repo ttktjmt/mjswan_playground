@@ -10,9 +10,9 @@ if TYPE_CHECKING:
     import mjswan
 
 _TASKS: dict[str, str] = {
-    "husky-skater": "mjswan_playground.husky_skater.main",
+    "husky": "mjswan_playground.husky.main",
     "pacman": "mjswan_playground.pacman.main",
-    "wbc-g1": "mjswan_playground.wbc_g1.main",
+    "wbc": "mjswan_playground.wbc.main",
 }
 
 ALL_TASKS: tuple[str, ...] = tuple(_TASKS)

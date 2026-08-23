@@ -1,4 +1,4 @@
-# HUSKY Skateboarding (`husky-skater`)
+# HUSKY Skateboarding (`husky`)
 
 Source: https://github.com/TeleHuman/humanoid_skateboarding ·
 project page: https://husky-humanoid.github.io
@@ -12,7 +12,7 @@ A Unitree G1 riding a skateboard, pushing and steering under whole-body control.
 ## Run
 
 ```sh
-uv run mjswan-playground run husky-skater
+uv run mjswan-playground run husky
 ```
 
 The build clones the HUSKY repository into `.cache/` at a pinned

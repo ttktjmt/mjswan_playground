@@ -1,4 +1,4 @@
-# WBC-Mjlab G1 (`wbc-g1`)
+# WBC-Mjlab G1 (`wbc`)
 
 Source: https://github.com/wbc-mjlab/wbc-mjlab (Apache-2.0) ·
 policy and clips from https://github.com/wbc-mjlab/wbc-g1-deploy (Apache-2.0) ·
@@ -11,7 +11,7 @@ dance, a fight combo, a flip — and the same controller tracks it.
 
 ```sh
 uv sync --extra wbc             # wbc-mjlab registers the Wbc-* tasks with mjlab
-uv run mjswan-playground run wbc-g1
+uv run mjswan-playground run wbc
 ```
 
 `wbc-mjlab` registers its tasks through mjlab's `mjlab.tasks` entry point, so

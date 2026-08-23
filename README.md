@@ -6,9 +6,9 @@ A collection of tasks built with [mjswan](https://github.com/ttktjmt/mjswan).
 
 | Task ID | Robot | Description | Link |
 |---------|-------|-------------|------|
-| [`husky-skater`](src/mjswan_playground/husky_skater/README.md) | Unitree G1 | Skateboarding under whole-body control ([HUSKY](https://husky-humanoid.github.io/), RSS 2026) | [WIP] |
+| [`husky`](src/mjswan_playground/husky/README.md) | Unitree G1 | Skateboarding under whole-body control ([HUSKY](https://husky-humanoid.github.io/), RSS 2026) | [WIP] |
 | [`pacman`](src/mjswan_playground/pacman/README.md) | Unitree G1 | Dodging thrown balls from a head depth camera, and the walk policy beside it ([PAC-MAN](https://lzyang2000.github.io/perceptive_cbf_rl/), 2026) | [WIP] |
-| [`wbc-g1`](src/mjswan_playground/wbc_g1/README.md) | Unitree G1 | One [wbc-mjlab](https://github.com/wbc-mjlab/wbc-mjlab) tracking policy over various motions | [WIP] |
+| [`wbc`](src/mjswan_playground/wbc/README.md) | Unitree G1 | One [wbc-mjlab](https://github.com/wbc-mjlab/wbc-mjlab) tracking policy over various motions | [WIP] |
 
 ## CLI
 
@@ -29,11 +29,11 @@ mjswan_playground can be imported as a Python package, and each task's builder c
 ```python
 import mjswan_playground
 
-builder = mjswan_playground.load("husky-skater")
+builder = mjswan_playground.load("husky")
 builder.build(output_dir="dist").launch()
 ```
 
-Each task also lives at `mjswan_playground.<task_module>.main` (the task ID with underscores, e.g. `mjswan_playground.husky_skater.main`), exposing `setup_builder()`.
+Each task also lives at `mjswan_playground.<task_module>.main` (the task ID with underscores, e.g. `mjswan_playground.husky.main`), exposing `setup_builder()`.
 
 ## License
 

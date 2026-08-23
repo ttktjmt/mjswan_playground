@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Registers the `Wbc-*` tasks with mjlab; only the wbc-g1 task needs it.
+# Registers the `Wbc-*` tasks with mjlab; only the wbc task needs it.
 wbc = ["wbc-mjlab>=0.0.5"]
 
 [project.scripts]

@@ -20,5 +20,5 @@ def test_task_module_defines_setup_builder(task_id: str) -> None:
 
 
 def test_unknown_task_lists_the_known_ones() -> None:
-    with pytest.raises(KeyError, match="husky-skater"):
+    with pytest.raises(KeyError, match="husky"):
         load("nope")
