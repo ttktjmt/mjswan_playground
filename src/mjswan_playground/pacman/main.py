@@ -156,24 +156,19 @@ def _add_dodge_scene(project: mjswan.ProjectHandle, root, contract) -> None:
 
 
 def _add_walk_scene(project: mjswan.ProjectHandle, root, contract) -> None:
-    """The locomotion half of the same stack, on flat ground and on the sliders."""
+    """The locomotion half of the same stack, on flat ground.
+
+    No `commands=`: the scene's `env_cfg` carries upstream's own `twist`, which mjswan
+    adapts — resampled as mjlab resamples it, with mjlab's joystick panel over the top.
+    """
     env_cfg = load_env_cfg(WALK_TASK_ID, play=True)
     for name in MOTION_EVENTS:
         env_cfg.events.pop(name, None)
 
     scene = project.add_scene_mjlab(WALK_TASK_ID, env_cfg=env_cfg)
-    ranges = env_cfg.commands[COMMAND_NAME].ranges
     scene.add_policy(
         name="AMP Walk",
         policy=onnx.load(str(root / WALK_POLICY_ONNX)),
-        commands={
-            COMMAND_NAME: mjswan.velocity_command(
-                lin_vel_x=ranges.lin_vel_x,
-                lin_vel_y=ranges.lin_vel_y,
-                ang_vel_z=ranges.ang_vel_z,
-                default_lin_vel_x=DEFAULT_FORWARD_SPEED,
-            )
-        },
         policy_joint_names=[f"robot/{name}" for name in contract.POLICY_JOINT_NAMES],
         default_joint_pos=[float(value) for value in contract.DEFAULT_POS],
         default=True,
@@ -187,7 +182,6 @@ def setup_builder() -> mjswan.Builder:
 
     builder = mjswan.Builder()
     project = builder.add_project(name="PAC-MAN")
-    # Dodging first: it is the scene the viewer opens on.
     _add_dodge_scene(project, root, contract)
     _add_walk_scene(project, root, contract)
     return builder

@@ -31,10 +31,8 @@ ENTITY = "robot"
 CONTROL_DT = 0.02
 #: `G1SkaterManagerBasedRlEnvCfg.cycle_time`: seconds per push -> steer cycle.
 CYCLE_TIME = 6.0
-#: The group's `history_length=5`, spelled out oldest frame first. Since mjswan 0.9.2 a
-#: count stacks that way too, so `history_length=5` would now say the same thing; naming
-#: the offsets keeps this task's bundle unchanged across that engine bump.
-HISTORY_STEPS = (4, 3, 2, 1, 0)
+#: `G1SkaterManagerBasedRlEnvCfg`: frames the observation group stacks.
+HISTORY_LENGTH = 5
 
 
 def _resolve_husky_root() -> Path:
@@ -182,45 +180,38 @@ def setup_builder() -> mjswan.Builder:
             ),
         },
         observations=ObservationGroupCfg(
+            history_length=HISTORY_LENGTH,
             terms={
                 "command": ObservationTermCfg(
                     func=obs_fns.generated_commands,
                     params={"command_name": "skate"},
                     scale=(2.0, 1.0),
-                    history_steps=HISTORY_STEPS,
                 ),
                 "heading": ObservationTermCfg(
                     func=terms.heading,
                     scale=1.0 / math.pi,
-                    history_steps=HISTORY_STEPS,
                 ),
                 "base_ang_vel": ObservationTermCfg(
                     func=obs_fns.builtin_sensor,
                     params={"sensor_name": f"{ENTITY}/imu_ang_vel"},
                     scale=0.25,
-                    history_steps=HISTORY_STEPS,
                 ),
                 "projected_gravity": ObservationTermCfg(
                     func=obs_fns.projected_gravity,
-                    history_steps=HISTORY_STEPS,
                 ),
                 "joint_pos": ObservationTermCfg(
                     func=obs_fns.joint_pos_rel,
-                    history_steps=HISTORY_STEPS,
                 ),
                 "joint_vel": ObservationTermCfg(
                     func=obs_fns.joint_vel_rel,
                     scale=0.05,
-                    history_steps=HISTORY_STEPS,
                 ),
                 "actions": ObservationTermCfg(
                     func=obs_fns.last_action,
-                    history_steps=HISTORY_STEPS,
                 ),
                 "phase": ObservationTermCfg(
                     func=obs_fns.generated_commands,
                     params={"command_name": "phase"},
-                    history_steps=HISTORY_STEPS,
                 ),
             },
         ),
