@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, get_args
 
 import mjswan
 import onnx
 from mjlab.tasks.registry import load_env_cfg
 from mjswan.adapters import DEFAULT_OBS_GROUP_KEY, adapt_observations
-from mjswan.managers.event_manager import EventTermCfg
+from mjswan.managers.event_manager import EventMode, EventTermCfg
 from mjswan.managers.observation_manager import ObservationTermCfg
 
 from . import terms, upstream
@@ -33,9 +33,28 @@ DEFAULT_FORWARD_SPEED = 0.5
 #: Reference-state initialization from the AMP clips — see README.
 MOTION_EVENTS = ("init_motion_loader", "reset_from_motion")
 #: Dodge events with nothing to trace, or nothing to trace them from — see README.
+#: `randomize_ball_size` is the one that could come back: mjswan describes `dr.geom_size`
+#: for the browser now, but this scene's depth image is analytic and bakes the ball's
+#: radius at build time, so a size drawn in the browser would show the policy a ball it
+#: is not facing — at 12.5 cm, roughly a third of the pixels the ball covers. It stays
+#: dropped until a traced term can read a model field as a slot.
 DROPPED_DODGE_EVENTS = MOTION_EVENTS + ("throw_ball_on_dwell", "randomize_ball_size")
 #: A dwell counter mjswan has no state for; `bad_base_height` still catches the fall.
 DROPPED_DODGE_TERMINATIONS = ("collapsed_crouch",)
+
+#: The throw's two threat types, each on its own button, as upstream's play viewer offers
+#: them — the policy answers a rising ball and a falling one differently, so asking for
+#: one is most of what watching this demo is for. Name, button label, `high_fraction`:
+#: the interval throw keeps upstream's 50/50 mix, a button forces its branch.
+MANUAL_THROWS = (
+    # Upstream's HIGH branch: launched low, rising to torso/head height — duck, or lean.
+    ("throw_overhead", "Throw overhead", 1.0),
+    # Its LOW branch: launched at ~2 m with no upward speed, descending across the legs.
+    ("throw_underbody", "Throw underbody", 0.0),
+)
+#: The interval throw's own control — the checkbox arming it, which is upstream's "Pause
+#: ball throws" the other way up.
+AUTO_THROW_LABEL = "Auto throw"
 
 #: Upstream's throw geometry, under this task's names for it.
 _THROW_PARAMS = {
@@ -58,6 +77,23 @@ _DEPTH_KEYS = (
     "ball_geom_name",
     "update_period",
 )
+
+
+def _require_manual_events() -> None:
+    """Refuse an engine whose event modes stop at startup / reset / interval.
+
+    The throw buttons are `mode="manual"` terms, and an engine that has never heard of
+    that mode buckets an unknown one with the reset terms — so the buttons would not
+    fail, they would quietly become "throw again on every reset". The mode is what this
+    depends on, so the mode is what it asks for.
+    """
+    if "manual" not in get_args(EventMode):
+        raise RuntimeError(
+            f'The pacman task\'s throw buttons need mjswan with `mode="manual"` event '
+            f"terms; the installed {mjswan.__version__} has "
+            f"{sorted(get_args(EventMode))}. Upgrade mjswan to the release carrying "
+            "ttktjmt/mjswan#104 (see pyproject.toml)."
+        )
 
 
 def _depth_geometry(params: dict[str, Any]) -> dict[str, Any]:
@@ -109,7 +145,8 @@ def _strip_untraceable(env_cfg: Any) -> None:
 
 
 def _add_dodge_scene(project: mjswan.ProjectHandle, root, contract) -> None:
-    """The paper's regime: a ball every 1–4 s, seen only as a depth image."""
+    """The paper's regime: a ball every 1–4 s, or one on demand, seen only as depth."""
+    _require_manual_events()
     env_cfg = load_env_cfg(DODGE_TASK_ID, play=True)
     upstream_throw = env_cfg.events["throw_ball_on_dwell"].params
     throw_params = {
@@ -130,7 +167,17 @@ def _add_dodge_scene(project: mjswan.ProjectHandle, root, contract) -> None:
         mode="interval",
         interval_range_s=throw_interval,
         params=throw_params,
+        label=AUTO_THROW_LABEL,
     )
+    # One graph each, so a button's throw is its branch and nothing else: the mix is a
+    # `rand` draw the graph carries, and `high_fraction` decides it before the trace.
+    for name, label, high_fraction in MANUAL_THROWS:
+        env_cfg.events[name] = EventTermCfg(
+            func=terms.throw_ball,
+            mode="manual",
+            params={**throw_params, "high_fraction": high_fraction},
+            label=label,
+        )
 
     # One group: the actor reads `("actor", "depth")` concatenated, image last.
     observations = adapt_observations(env_cfg.observations[ACTOR_GROUP])[
