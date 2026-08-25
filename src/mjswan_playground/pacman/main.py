@@ -33,27 +33,24 @@ DEFAULT_FORWARD_SPEED = 0.5
 #: Reference-state initialization from the AMP clips — see README.
 MOTION_EVENTS = ("init_motion_loader", "reset_from_motion")
 #: Dodge events with nothing to trace, or nothing to trace them from — see README.
-#: `randomize_ball_size` is the one that could come back: mjswan describes `dr.geom_size`
-#: for the browser now, but this scene's depth image is analytic and bakes the ball's
-#: radius at build time, so a size drawn in the browser would show the policy a ball it
-#: is not facing — at 12.5 cm, roughly a third of the pixels the ball covers. It stays
-#: dropped until a traced term can read a model field as a slot.
+#: `randomize_ball_size` could come back — mjswan describes `dr.geom_size` now — but this
+#: scene's depth image is analytic and bakes the radius at build time, so a size drawn in
+#: the browser would show the policy a ball it is not facing. It stays dropped until a
+#: traced term can read a model field as a slot.
 DROPPED_DODGE_EVENTS = MOTION_EVENTS + ("throw_ball_on_dwell", "randomize_ball_size")
 #: A dwell counter mjswan has no state for; `bad_base_height` still catches the fall.
 DROPPED_DODGE_TERMINATIONS = ("collapsed_crouch",)
 
-#: The throw's two threat types, each on its own button, as upstream's play viewer offers
-#: them — the policy answers a rising ball and a falling one differently, so asking for
-#: one is most of what watching this demo is for. Name, button label, `high_fraction`:
-#: the interval throw keeps upstream's 50/50 mix, a button forces its branch.
+#: The throw's two threat types, each on its own button as upstream's play viewer offers
+#: them. Name, button label, `high_fraction`: the interval throw keeps upstream's 50/50
+#: mix, a button forces its branch.
 MANUAL_THROWS = (
-    # Upstream's HIGH branch: launched low, rising to torso/head height — duck, or lean.
+    # Upstream's HIGH branch: launched low, rising to torso/head height.
     ("throw_overhead", "Throw overhead", 1.0),
     # Its LOW branch: launched at ~2 m with no upward speed, descending across the legs.
     ("throw_underbody", "Throw underbody", 0.0),
 )
-#: The interval throw's own control — the checkbox arming it, which is upstream's "Pause
-#: ball throws" the other way up.
+#: The interval throw's arm checkbox — upstream's "Pause ball throws" the other way up.
 AUTO_THROW_LABEL = "Auto throw"
 
 #: Upstream's throw geometry, under this task's names for it.
@@ -82,10 +79,8 @@ _DEPTH_KEYS = (
 def _require_manual_events() -> None:
     """Refuse an engine whose event modes stop at startup / reset / interval.
 
-    The throw buttons are `mode="manual"` terms, and an engine that has never heard of
-    that mode buckets an unknown one with the reset terms — so the buttons would not
-    fail, they would quietly become "throw again on every reset". The mode is what this
-    depends on, so the mode is what it asks for.
+    An engine that has never heard of `mode="manual"` buckets an unknown mode with the
+    reset terms, so the throw buttons would not fail — they would throw on every reset.
     """
     if "manual" not in get_args(EventMode):
         raise RuntimeError(
@@ -169,8 +164,7 @@ def _add_dodge_scene(project: mjswan.ProjectHandle, root, contract) -> None:
         params=throw_params,
         label=AUTO_THROW_LABEL,
     )
-    # One graph each, so a button's throw is its branch and nothing else: the mix is a
-    # `rand` draw the graph carries, and `high_fraction` decides it before the trace.
+    # One graph each: `high_fraction` decides the branch at trace time, not at runtime.
     for name, label, high_fraction in MANUAL_THROWS:
         env_cfg.events[name] = EventTermCfg(
             func=terms.throw_ball,

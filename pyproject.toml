@@ -10,9 +10,7 @@ authors = [{ name = "mjswan Developers" }]
 requires-python = ">=3.10, <3.13"
 dependencies = [
     # ponytail: bump (and relock) once the release carrying `mode="manual"` event terms
-    # ships (ttktjmt/mjswan#104) — the `pacman` task's throw buttons are those, and
-    # `main.py` refuses to build against an engine without them rather than let them
-    # turn into reset events.
+    # ships (ttktjmt/mjswan#104); the pacman task's throw buttons need them.
     "mjswan>=0.9.2",
     "mjlab==1.5.3",
     "torch>=2.9.1",
