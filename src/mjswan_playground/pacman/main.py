@@ -33,24 +33,17 @@ DEFAULT_FORWARD_SPEED = 0.5
 #: Reference-state initialization from the AMP clips — see README.
 MOTION_EVENTS = ("init_motion_loader", "reset_from_motion")
 #: Dodge events with nothing to trace, or nothing to trace them from — see README.
-#: `randomize_ball_size` could come back — mjswan describes `dr.geom_size` now — but this
-#: scene's depth image is analytic and bakes the radius at build time, so a size drawn in
-#: the browser would show the policy a ball it is not facing. It stays dropped until a
-#: traced term can read a model field as a slot.
 DROPPED_DODGE_EVENTS = MOTION_EVENTS + ("throw_ball_on_dwell", "randomize_ball_size")
 #: A dwell counter mjswan has no state for; `bad_base_height` still catches the fall.
 DROPPED_DODGE_TERMINATIONS = ("collapsed_crouch",)
 
-#: The throw's two threat types, each on its own button as upstream's play viewer offers
-#: them. Name, button label, `high_fraction`: the interval throw keeps upstream's 50/50
-#: mix, a button forces its branch.
+#: The throw's two threat types, one button each, as upstream's play viewer has them.
 MANUAL_THROWS = (
-    # Upstream's HIGH branch: launched low, rising to torso/head height.
     ("throw_overhead", "Throw overhead", 1.0),
-    # Its LOW branch: launched at ~2 m with no upward speed, descending across the legs.
     ("throw_underbody", "Throw underbody", 0.0),
 )
-#: The interval throw's arm checkbox — upstream's "Pause ball throws" the other way up.
+#: The interval throw, and the label of the checkbox the browser arms it with.
+AUTO_THROW = "throw_ball"
 AUTO_THROW_LABEL = "Auto throw"
 
 #: Upstream's throw geometry, under this task's names for it.
@@ -77,11 +70,8 @@ _DEPTH_KEYS = (
 
 
 def _require_manual_events() -> None:
-    """Refuse an engine whose event modes stop at startup / reset / interval.
-
-    An engine that has never heard of `mode="manual"` buckets an unknown mode with the
-    reset terms, so the throw buttons would not fail — they would throw on every reset.
-    """
+    """Fail the build now: an unknown mode buckets with the reset terms, so on an engine
+    without `mode="manual"` the buttons would throw on every reset instead of failing."""
     if "manual" not in get_args(EventMode):
         raise RuntimeError(
             f'The pacman task\'s throw buttons need mjswan with `mode="manual"` event '
@@ -157,20 +147,22 @@ def _add_dodge_scene(project: mjswan.ProjectHandle, root, contract) -> None:
 
     _strip_untraceable(env_cfg)
     terms.add_camera_pose_sensors(env_cfg.scene.entities["robot"], CAMERA)
-    env_cfg.events["throw_ball"] = EventTermCfg(
+    env_cfg.events[AUTO_THROW] = EventTermCfg(
         func=terms.throw_ball,
         mode="interval",
         interval_range_s=throw_interval,
         params=throw_params,
         label=AUTO_THROW_LABEL,
     )
-    # One graph each: `high_fraction` decides the branch at trace time, not at runtime.
+    # One term per branch: `high_fraction` is baked at trace time, not read at runtime.
     for name, label, high_fraction in MANUAL_THROWS:
         env_cfg.events[name] = EventTermCfg(
             func=terms.throw_ball,
             mode="manual",
             params={**throw_params, "high_fraction": high_fraction},
             label=label,
+            # Two throwers on one launcher: the schedule has it, or the operator does.
+            disabled_when=AUTO_THROW,
         )
 
     # One group: the actor reads `("actor", "depth")` concatenated, image last.
