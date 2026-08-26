@@ -8,12 +8,12 @@ A collection of tasks built with [mjswan](https://github.com/ttktjmt/mjswan).
 |---------|-------|-------------|------|
 | [`husky`](src/mjswan_playground/husky/README.md) | Unitree G1 | Skateboarding under whole-body control ([HUSKY](https://husky-humanoid.github.io/), RSS 2026) | [mjswan.com/s/oM-paPA](https://mjswan.com/s/oM-paPA) |
 | [`wbc`](src/mjswan_playground/wbc/README.md) | Unitree G1 | One [wbc-mjlab](https://github.com/wbc-mjlab/wbc-mjlab) tracking policy over various motions | [mjswan.com/s/XWwo7dV](https://mjswan.com/s/XWwo7dV) |
-| [`pacman`](src/mjswan_playground/pacman/README.md) | Unitree G1 | Dodging thrown balls from a head depth camera, and the walk policy beside it ([PAC-MAN](https://lzyang2000.github.io/perceptive_cbf_rl/), 2026) | [mjswan.com/s/GOTofiq](https://mjswan.com/s/GOTofiq) |
+| [`pacman`](src/mjswan_playground/pacman/README.md) | Unitree G1 | Dodging thrown balls from a head depth camera ([PAC-MAN](https://lzyang2000.github.io/perceptive_cbf_rl/), 2026) | [mjswan.com/s/GOTofiq](https://mjswan.com/s/GOTofiq) |
 
 ## CLI
 
 ```
-uv run mjswan-playground <subcommand>
+uv run msp <subcommand>
 ```
 
 | Subcommand | Description | Options |
@@ -22,7 +22,7 @@ uv run mjswan-playground <subcommand>
 | `run <task-id>` | Build a task and open it in the browser | `--host` (`localhost`), `--port` (`8080`), `--no-open`, `--output-dir` |
 | `build <task-id>` | Build a task without launching | `--output-dir` |
 
-## Python package
+## Python
 
 mjswan_playground can be imported as a Python package, and each task's builder can be used to build and launch the demo:
 

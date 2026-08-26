@@ -23,6 +23,8 @@ wbc = ["wbc-mjlab>=0.0.5"]
 
 [project.scripts]
 mjswan-playground = "mjswan_playground._cli:app"
+# Short alias for the same CLI.
+msp = "mjswan_playground._cli:app"
 
 [project.urls]
 "GitHub" = "https://github.com/ttktjmt/mjswan_playground"
