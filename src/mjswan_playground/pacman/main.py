@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, get_args
 
 import mjswan
 import onnx
 from mjlab.tasks.registry import load_env_cfg
 from mjswan.adapters import DEFAULT_OBS_GROUP_KEY, adapt_observations
-from mjswan.managers.event_manager import EventTermCfg
+from mjswan.managers.event_manager import EventMode, EventTermCfg
 from mjswan.managers.observation_manager import ObservationTermCfg
 
 from . import terms, upstream
@@ -37,6 +37,15 @@ DROPPED_DODGE_EVENTS = MOTION_EVENTS + ("throw_ball_on_dwell", "randomize_ball_s
 #: A dwell counter mjswan has no state for; `bad_base_height` still catches the fall.
 DROPPED_DODGE_TERMINATIONS = ("collapsed_crouch",)
 
+#: The throw's two threat types, one button each, as upstream's play viewer has them.
+MANUAL_THROWS = (
+    ("throw_overhead", "Throw overhead", 1.0),
+    ("throw_underbody", "Throw underbody", 0.0),
+)
+#: The interval throw, and the label of the checkbox the browser arms it with.
+AUTO_THROW = "throw_ball"
+AUTO_THROW_LABEL = "Auto throw"
+
 #: Upstream's throw geometry, under this task's names for it.
 _THROW_PARAMS = {
     "dist_range": "dist_range",
@@ -58,6 +67,18 @@ _DEPTH_KEYS = (
     "ball_geom_name",
     "update_period",
 )
+
+
+def _require_manual_events() -> None:
+    """Fail the build now: an unknown mode buckets with the reset terms, so on an engine
+    without `mode="manual"` the buttons would throw on every reset instead of failing."""
+    if "manual" not in get_args(EventMode):
+        raise RuntimeError(
+            f'The pacman task\'s throw buttons need mjswan with `mode="manual"` event '
+            f"terms; the installed {mjswan.__version__} has "
+            f"{sorted(get_args(EventMode))}. Upgrade mjswan to the release carrying "
+            "ttktjmt/mjswan#104 (see pyproject.toml)."
+        )
 
 
 def _depth_geometry(params: dict[str, Any]) -> dict[str, Any]:
@@ -109,7 +130,8 @@ def _strip_untraceable(env_cfg: Any) -> None:
 
 
 def _add_dodge_scene(project: mjswan.ProjectHandle, root, contract) -> None:
-    """The paper's regime: a ball every 1–4 s, seen only as a depth image."""
+    """The paper's regime: a ball every 1–4 s, or one on demand, seen only as depth."""
+    _require_manual_events()
     env_cfg = load_env_cfg(DODGE_TASK_ID, play=True)
     upstream_throw = env_cfg.events["throw_ball_on_dwell"].params
     throw_params = {
@@ -125,12 +147,23 @@ def _add_dodge_scene(project: mjswan.ProjectHandle, root, contract) -> None:
 
     _strip_untraceable(env_cfg)
     terms.add_camera_pose_sensors(env_cfg.scene.entities["robot"], CAMERA)
-    env_cfg.events["throw_ball"] = EventTermCfg(
+    env_cfg.events[AUTO_THROW] = EventTermCfg(
         func=terms.throw_ball,
         mode="interval",
         interval_range_s=throw_interval,
         params=throw_params,
+        label=AUTO_THROW_LABEL,
     )
+    # One term per branch: `high_fraction` is baked at trace time, not read at runtime.
+    for name, label, high_fraction in MANUAL_THROWS:
+        env_cfg.events[name] = EventTermCfg(
+            func=terms.throw_ball,
+            mode="manual",
+            params={**throw_params, "high_fraction": high_fraction},
+            label=label,
+            # Two throwers on one launcher: the schedule has it, or the operator does.
+            disabled_when=AUTO_THROW,
+        )
 
     # One group: the actor reads `("actor", "depth")` concatenated, image last.
     observations = adapt_observations(env_cfg.observations[ACTOR_GROUP])[
