@@ -1,9 +1,7 @@
 """MicroDuck: the nine policies the robot ships, each in the scene it runs in.
 
-Nothing here reimplements upstream's training envs — the robot XMLs already carry the
-position actuators the real servos run, so the scenes compile straight from them and the
-policies read the same 61-value observation ``robotd`` builds on the robot. See
-``README.md``.
+The robot XMLs already carry the position actuators the real servos run, so the scenes
+compile straight from them rather than from upstream's training envs. See ``README.md``.
 """
 
 from __future__ import annotations
@@ -46,40 +44,33 @@ ROOT_JOINT = "trunk_base_freejoint"
 TRACKED_BODY = "trunk_base"
 BALL_JOINT = "ball_free"
 
-#: ``sim.mujoco.timestep`` (0.005) * ``decimation`` (4) — 50 Hz, the rate every policy
-#: acts at. The XMLs carry no ``<option>``, so both halves travel in the spec.
+#: ``sim.mujoco.timestep`` (0.005) * ``decimation`` (4) — 50 Hz. The XMLs carry no
+#: ``<option>``, so both halves travel in the spec.
 CONTROL_DT = 0.02
 TIMESTEP = 0.005
-#: The rest of mjlab's ``MujocoCfg`` for the velocity task, where it differs from
-#: MuJoCo's own XML defaults (Euler, 100/50 solver iterations).
+#: The rest of mjlab's ``MujocoCfg``; MuJoCo's XML defaults are Euler and 100/50.
 INTEGRATOR = mujoco.mjtIntegrator.mjINT_IMPLICITFAST
 SOLVER_ITERATIONS = 10
 SOLVER_LS_ITERATIONS = 20
 
 #: The keyframe every scene resets to: upstream's STAND2 / ``HOME_FRAME``.
 STAND_KEY = "STAND"
-#: ``infer_policy.py``'s spawn height, 5 mm above the keyframe's own — the rollers add
-#: 13.5 mm of wheel under the soles.
+#: ``infer_policy.py``'s spawn heights: 5 mm above the keyframe's, plus wheel on rollers.
 STAND_HEIGHT = 0.125
 ROLLERS_STAND_HEIGHT = 0.1385
-#: Wheel-bearing friction, which upstream writes at inference time rather than into the
-#: XML ("non-zero frictionloss in the XML breaks training").
+#: Wheel-bearing friction, which upstream sets at inference time rather than in the XML
+#: ("non-zero frictionloss in the XML breaks training").
 WHEEL_FRICTIONLOSS = 0.003
-#: Where the kick ball sits, in the robot's yaw frame: the placement
-#: ``reset_ball_in_front_of_foot``'s docstring derives, "the toe tip at x~=0.034, so
-#: (0.08, -0.042) puts a 35mm-radius ball ~1cm in front of the toe". Mirrored per foot.
-#:
-#: Not that function's own default of 0.09, which it only ever uses as the centre of a
-#: +/-15 mm per-axis draw: the policies are blind to the ball, so the jitter is what makes
-#: the swing robust rather than aimed, and some placements inside it genuinely miss. A
-#: scene bakes one placement, so it bakes the documented one — at 0.09 the right foot
-#: swings past a stationary ball.
+#: Where the kick ball sits, from ``reset_ball_in_front_of_foot``'s docstring: "the toe
+#: tip at x~=0.034, so (0.08, -0.042) puts a 35mm-radius ball ~1cm in front of the toe".
+#: Mirrored per foot. Not that function's 0.09 default, which is only the centre of a
+#: +/-15 mm draw: a scene bakes one placement, and at 0.09 the right foot swings past.
 BALL_OFFSET_X = 0.08
 BALL_OFFSET_ABS_Y = 0.042
 BALL_RADIUS = 0.035
 
-#: ``make_velocity_env_cfg``'s own fall termination, which upstream keeps on the walking,
-#: pick, kick and roller tasks and drops on the ones that start or end on the ground.
+#: ``make_velocity_env_cfg``'s fall termination, which upstream drops on the policies
+#: that start or end on the ground.
 FELL_OVER_ANGLE_DEG = 70.0
 
 #: Final command ranges the curricula reach — what a finished policy has seen.
@@ -89,30 +80,28 @@ ROLLER_THROTTLE_RANGE = (-0.5, 0.6)
 ROLLER_HEADING_RANGE = (-1.0, 1.0)
 HEAD_RANGES = ((-1.10, 1.10), (-1.10, 1.10), (-1.40, 1.40), (-0.31, 0.31))
 HEAD_LABELS = ("Neck Pitch", "Head Pitch", "Head Yaw", "Head Roll")
-#: Only z / roll / pitch are steerable; x, y and yaw stay alive-range noise upstream
-#: never trains as a command, so they are padded with the zero they were centred on.
+#: Only z / roll / pitch are steerable; x, y and yaw are alive-range noise upstream never
+#: trains as a command, so they are padded with the zero they were centred on.
 BODY_Z_RANGE = (-0.04, 0.030)
 BODY_ANGLE_RANGE = (-math.radians(15), math.radians(15))
 
 
 @dataclass(frozen=True)
 class _Demo:
-    """One shipped checkpoint, the scene it runs in, and what its env drove each command
-    slot with.
+    """One shipped checkpoint, the scene it runs in, and what drove each command slot.
 
-    One policy per scene, not one scene per model file: mjswan 0.9.3 writes a scene's
-    fused observation graph to ``obs/<group>.onnx``, a path shared by every policy on the
-    scene, so policies that read different command slots would overwrite each other's
-    graph. The nine here need five different observation layouts, so they get nine scenes,
-    compiled from four specs: upstream's three XMLs, with the kick one mirrored per foot.
+    One policy per scene, not one per model file: mjswan 0.9.3 writes a scene's fused
+    observation graph to ``obs/<group>.onnx``, one path for every policy on the scene, so
+    policies reading different command slots would overwrite each other's. The nine need
+    five layouts, hence nine scenes off four specs: upstream's three XMLs, kick mirrored.
     """
 
     name: str
     onnx: str
     xml: str
     twist: str
-    """``"velocity"``, ``"heading"``, ``"posture"``, ``"phase"`` or ``"zero"`` — which of
-    the five shapes upstream put in the twist slot for this policy's env."""
+    """Which of five shapes upstream put in this policy's twist slot: ``"velocity"``,
+    ``"heading"``, ``"posture"``, ``"phase"`` or ``"zero"``."""
     head: bool = False
     body: bool = False
     fell_over: bool = True
@@ -120,10 +109,9 @@ class _Demo:
     wheels: bool = False
     ball_y: float | None = None
     trace_xml: str | None = None
-    """The spec ONNX tracing runs against, when it cannot be the scene's own. Only the
-    kick scenes need it: an mjlab ``Entity`` is one freejoint, and theirs holds a second
-    for the ball. Nothing the policies read touches the ball — they are blind to it — so
-    the robot alone covers every term, which is also how ``husky`` traces."""
+    """The spec tracing runs against, when it cannot be the scene's own. Only the kick
+    scenes need it: an mjlab ``Entity`` is one freejoint and theirs holds a second for the
+    ball, which no policy reads anyway."""
 
 
 DEMOS = (
@@ -203,11 +191,9 @@ def _resolve_deploy_root() -> Path:
 
 
 def _servo_joints(model: mujoco.MjModel) -> list[str]:
-    """The 14 servos in actuator order — the order every policy reads and writes.
-
-    Upstream's runtime indexes the same way (``jnt_qposadr[actuator_trnid]``), which is
-    why the rollers model's four passive wheel hinges fall out on their own.
-    """
+    """The 14 servos in actuator order, the order every policy reads and writes — the
+    same way upstream's runtime indexes (``jnt_qposadr[actuator_trnid]``), which drops the
+    rollers model's four passive wheel hinges on its own."""
     names: list[str] = []
     for actuator in range(model.nu):
         if model.actuator_trntype[actuator] != mujoco.mjtTrn.mjTRN_JOINT:
@@ -217,12 +203,11 @@ def _servo_joints(model: mujoco.MjModel) -> list[str]:
 
 
 def _stand_pose(scene_xml: Path) -> dict[str, float]:
-    """The STAND keyframe's joint positions by name: the pose actions offset from and
-    every ``*_rel`` observation subtracts (upstream's ``DEFAULT_POSE``).
+    """The STAND keyframe's joint positions by name: what actions offset from and every
+    ``*_rel`` observation subtracts (upstream's ``DEFAULT_POSE``).
 
-    Read out of the scene rather than copied, and read from ``scene.xml`` for every scene:
-    the ball scene carries no keyframe at all (a freejoint it cannot size a ``qpos`` for)
-    and the rollers scene's is the same pose at a different height.
+    Read from ``scene.xml`` for every scene: the ball scene carries no keyframe and the
+    rollers scene's is the same pose at a different height.
     """
     model = mujoco.MjSpec.from_file(str(scene_xml)).compile()
     key = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, STAND_KEY)
@@ -246,19 +231,17 @@ def _scene_spec(
     sim_options: bool = True,
 ) -> mujoco.MjSpec:
     """The scene as the browser compiles it: upstream's solver settings (the XMLs carry
-    no ``<option>``, so both halves of the control rate travel here), the wheel friction
-    its inference script writes by hand, and one keyframe — STAND.
+    no ``<option>``), the wheel friction its inference script writes by hand, and one
+    keyframe.
 
-    STAND has to be the *only* keyframe, not merely present: the browser resets to the
-    first one, and so does the tracing env, whose ``default_joint_pos`` is what
-    ``joint_pos_rel`` bakes in. Leaving upstream's INIT first would hand every policy
-    joint positions relative to a zero pose it never trained against.
+    STAND has to be the *only* keyframe: the browser resets to the first one, and so does
+    the tracing env, whose ``default_joint_pos`` ``joint_pos_rel`` bakes in. Upstream's
+    INIT first would pose every policy against a zero it never trained on.
     """
     spec = mujoco.MjSpec.from_file(str(scene_xml))
     if sim_options:
-        # Left off the tracing spec, which mjlab attaches under a scene of its own and
-        # whose options win the conflict anyway. Nothing traced depends on them: the
-        # tracer records which fields a term reads, and those become graph inputs.
+        # Left off the tracing spec, whose own scene's options win the conflict anyway;
+        # nothing traced depends on them.
         spec.option.timestep = TIMESTEP
         spec.option.integrator = INTEGRATOR
         spec.option.iterations = SOLVER_ITERATIONS
@@ -325,11 +308,8 @@ def _sliders(specs: list[tuple[str, str, tuple[float, float]]]) -> mjswan.Comman
 
 
 def _twist_commands(kind: str) -> dict[str, mjswan.CommandInput]:
-    """The browser-side command terms this policy's twist slot needs, if any.
-
-    A slot upstream pinned to zero gets no command at all — it is padded in the
-    observation instead, which is what its env did.
-    """
+    """The browser-side command terms this policy's twist slot needs, if any. A slot
+    upstream pinned to zero gets no command — it is padded in the observation instead."""
     if kind == "velocity":
         return {
             "twist": _sliders(
@@ -342,8 +322,7 @@ def _twist_commands(kind: str) -> dict[str, mjswan.CommandInput]:
         }
     if kind == "heading":
         return {
-            # Two commands rather than one: the middle slot is `lin_vel_y`, which
-            # upstream's roller env pins to (0, 0), so it is padding between them.
+            # Two commands, not one: the middle slot is padding — see `_twist_terms`.
             "throttle": _sliders(
                 [("lin_vel_x", "Forward (m/s)", ROLLER_THROTTLE_RANGE)]
             ),
@@ -374,8 +353,7 @@ def _twist_terms(kind: str) -> dict[str, ObservationTermCfg]:
             )
         }
     if kind == "heading":
-        # `lin_vel_y` is the middle slot and upstream's roller env pins its range to
-        # (0, 0), so it is padding, not a control.
+        # `lin_vel_y` is the middle slot, pinned to (0, 0) by upstream's roller env.
         return {
             "throttle": ObservationTermCfg(
                 func=generated, params={"command_name": "throttle"}
@@ -429,8 +407,8 @@ def _pose_terms(policy: _Demo) -> dict[str, ObservationTermCfg]:
     else:
         pose["head_command"] = ObservationTermCfg(func=terms.zeros, params={"dim": 4})
     if policy.body:
-        # [x, y, z, roll, pitch, yaw]: x and y lead, yaw trails, and none of the three is
-        # a command upstream trains — they stay at the zero their alive-range is centred on.
+        # [x, y, z, roll, pitch, yaw]: x, y and yaw are not commands upstream trains, so
+        # they stay at the zero their alive-range is centred on.
         pose["body_xy"] = ObservationTermCfg(func=terms.zeros, params={"dim": 2})
         pose["body_command"] = ObservationTermCfg(
             func=generated, params={"command_name": "body_pose"}
@@ -445,8 +423,8 @@ def _observations(policy: _Demo, joints: SceneEntityCfg) -> ObservationGroupCfg:
     """The 61 values ``robotd`` builds, in its order: 3 gyro + 3 gravity + 14 joint
     positions + 14 joint velocities + 14 last actions + a 13-wide command block."""
     group: dict[str, ObservationTermCfg] = {
-        # The gyro upstream reads sits on an identity-oriented site on the root body, so
-        # its reading *is* the root's body-frame angular velocity.
+        # Upstream's gyro sits on an identity-oriented site on the root body, so it
+        # reads exactly this.
         "base_ang_vel": ObservationTermCfg(func=obs_fns.base_ang_vel),
         "projected_gravity": ObservationTermCfg(func=obs_fns.projected_gravity),
         "joint_pos": ObservationTermCfg(
@@ -463,12 +441,11 @@ def _observations(policy: _Demo, joints: SceneEntityCfg) -> ObservationGroupCfg:
 
 
 def _trace_commands(policy: _Demo) -> dict[str, object]:
-    """Trace-time widths for the commands the browser owns. The phase clock is built and
-    traced for real, so it is not among them."""
+    """Trace-time widths for the commands the browser owns."""
     widths = {
         "velocity": {"twist": 3},
-        # The clock is built and traced for real, but the observation term that reads it
-        # still resolves the name against the trace env — as husky's does.
+        # The clock is traced for real, but the term reading it still resolves its name
+        # against the trace env — as husky's does.
         "phase": {"twist": 3},
         "heading": {"throttle": 1, "heading": 1},
     }
@@ -523,9 +500,8 @@ def setup_builder() -> mjswan.Builder:
         scene = project.add_scene(name=demo.name, spec=spec, control_dt=CONTROL_DT)
         scene.set_viewer(
             mjswan.ViewerConfig(
-                # A three-quarter view from the front: the robot is 25 cm tall and its
-                # face is the half worth watching, so the camera sits off the +x axis
-                # rather than behind, and closer in than a humanoid's would be.
+                # Three-quarter view from the front: 25 cm of robot, and its face is
+                # the half worth watching.
                 origin_type=mjswan.ViewerConfig.OriginType.ASSET_BODY,
                 body_name=TRACKED_BODY,
                 distance=0.8,
@@ -552,9 +528,8 @@ def setup_builder() -> mjswan.Builder:
             commands={**_twist_commands(demo.twist), **_pose_commands(demo)},
             observations=_observations(demo, joints),
             actions={
-                # The XML's own `<position>` actuators, whose gains the browser reads off
-                # the compiled model — so no PD to configure here. `scale=1.0` with the
-                # default offset is upstream's `default_pose + action * action_scale`.
+                # The XML's own `<position>` actuators: the browser reads their gains
+                # off the compiled model, so there is no PD to configure here.
                 "joint_pos": JointPositionActionCfg(
                     entity_name="",
                     actuator_names=(".*",),
