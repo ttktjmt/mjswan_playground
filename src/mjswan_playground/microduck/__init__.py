@@ -1,1 +1,1 @@
-"""MicroDuck task."""
+"""Microduck task."""

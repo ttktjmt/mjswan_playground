@@ -1,4 +1,4 @@
-"""MicroDuck: the nine policies the robot ships, each in the scene it runs in.
+"""Microduck: the nine policies the robot ships, each in the scene it runs in.
 
 The robot XMLs already carry the position actuators the real servos run, so the scenes
 compile straight from them rather than from upstream's training envs. See ``README.md``.
@@ -468,7 +468,7 @@ def setup_builder() -> mjswan.Builder:
     stand_pose = _stand_pose(rl_root / SCENE_XML)
 
     builder = mjswan.Builder()
-    project = builder.add_project(name="MicroDuck")
+    project = builder.add_project(name="Microduck")
 
     for index, demo in enumerate(DEMOS):
 
