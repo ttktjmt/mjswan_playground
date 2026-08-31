@@ -40,11 +40,11 @@ def _head(repo: Path) -> str:
 
 
 def ensure_repo(
-    *, name: str, url: str, commit: str, marker: str, root_env_var: str
+    *, name: str, url: str, commit: str, marker: str, root_env_var: str | None = None
 ) -> Path:
     """Return a checkout of ``url`` at ``commit``, cloning into the cache if needed, or
     whatever ``root_env_var`` points at if ``marker`` is present there."""
-    configured = os.getenv(root_env_var)
+    configured = os.getenv(root_env_var) if root_env_var else None
     if configured:
         root = Path(configured).expanduser().resolve()
         if not (root / marker).exists():

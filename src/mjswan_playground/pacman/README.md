@@ -22,17 +22,16 @@ that depth image and nothing else — no position, no velocity, no oracle.
 ## Run
 
 ```sh
-uv run mjswan-playground run pacman
+uv run msp run pacman
 ```
 
 The build clones the PAC-MAN repository into `.cache/` at a pinned commit; set
 `MJSWAN_PACMAN_ROOT` to point at a checkout you already have.
 
-Unlike [`husky`](../husky/README.md), this task **imports** upstream. The
-scenes are not shipped XML — the robot, its collision geometry and the terrain are
-assembled in Python by the repo's own mjlab task configs — so the checkout goes on
-`sys.path` and `add_scene_mjlab` builds each scene from its registered task
-([`upstream.py`](upstream.py)).
+Unlike [`husky`](../husky/README.md), this task **imports** upstream. The scenes are not
+shipped XML — the robot, its collision geometry and the terrain are assembled in Python by
+the repo's own mjlab task configs — so the checkout goes on `sys.path` and
+`add_scene_mjlab` builds each scene from its registered task ([`upstream.py`](upstream.py)).
 
 | From upstream | Used as |
 |---|---|
@@ -61,9 +60,9 @@ Both start from the same proprio group — six of mjlab's own MDP functions at
 takes 576 more: the 144-pixel image at look-back offsets `(0, 3, 8, 18)`, newest frame
 first. The proprio terms carry a plain frame count because mjlab and mjswan both stack
 history oldest frame first; the image's window is neither dense nor chronological, so it
-names its offsets instead. Upstream's dodge actor reads its two groups concatenated,
-while mjswan feeds one vector per ONNX input — so the task adapts upstream's own group
-and appends the image as one more term.
+names its offsets instead. Upstream's dodge actor reads its two groups concatenated, while
+mjswan feeds one vector per ONNX input — so the task adapts upstream's own group and
+appends the image as one more term.
 
 ## The image, without a camera
 
@@ -74,8 +73,7 @@ collapses into the perception layer.
 
 A browser has no renderer, and mjswan's slot reader serves entity fields, sensors,
 raycasts and contacts — not frames. But with a fixed camera and one sphere, a ball-only
-image *is* its ray-sphere intersections, which is what upstream's own browser demo
-computes
+image *is* its ray-sphere intersections, which is what upstream's own browser demo computes
 ([`web/src/depth.js`](https://github.com/lzyang2000/perceptive_cbf_rl/blob/web-demo/web/src/depth.js)).
 [`terms.ball_depth`](terms.py) does the same in torch, so it traces to ONNX like any other
 term: two `framepos` / `framequat` sensors give the camera pose, the ball's root position
@@ -93,6 +91,13 @@ frames rather than assumed:
   renderer marks as ball — a 0.076 m ball subtends 3° where a pixel spans 5.3°. The robot
   min-pools too: the ZED's depth is masked at full resolution, then pooled down to 9×16,
   so a sub-pixel ball still registers.
+
+Over 400 control steps of live throws, every pixel the renderer marks as ball is marked
+here too (218/218), to a median of 0.016 m and a maximum of 0.078 m — about one ball
+radius, the residue of sampling a sphere at different points inside a pixel. It also
+lights up ~1.2 pixels per frame the renderer does not, and catches the ball at ranges
+where the renderer's single sample misses it: that is the min-pool, i.e. the deployed
+behavior.
 
 Self-occlusion is not modelled — an arm in front of the ball segments as the arm in
 training, while here the ball stays visible. That only hands the policy a cleaner view
@@ -137,26 +142,11 @@ makes the same trade.
 - **`randomize_terrain` is a no-op**, as mjswan records in the bundle: it re-draws which
   sub-terrain an env spawns on, and the browser has one baked plane.
 
-## Fidelity
+## How it behaves
 
-- **The depth image**, against upstream's rendered `BallOnlyDepthObs` over 400 control
-  steps of live throws: every pixel the renderer marks as ball is marked here too
-  (218/218), agreeing to a median of 0.016 m and a maximum of 0.078 m — about one ball
-  radius, the residue of sampling a sphere at different points inside a pixel. It also
-  lights up ~1.2 pixels per frame the renderer does not, and catches the ball at ranges
-  where the renderer's single sample misses it: that is the min-pool, i.e. the deployed
-  behavior.
-- **Proprio**: `max |Δ| = 0` against the live mjlab env over 32 control steps, every term,
-  both scenes (`mjswan.compile.run_parity`). Same for the dodge scene's two ball-writing
-  events, the reset and the throw, over 16 fresh draws each.
-- **The articulation the checkpoints were exported against**: the action scale mjswan
-  resolves from the model matches upstream's deployed `ACTION_SCALE` to `1.7e-08` (float32
-  rounding), the rest pose matches `DEFAULT_POS` exactly, and the joint order is identical
-  to `POLICY_JOINT_NAMES`.
-- **Behavior**: fed these observations in a live mjlab env, the dodge checkpoint stays
-  upright through 30 s of throws — base height 0.72 m on average, never below 0.51 — and
-  is hit once in roughly twelve throws. One rollout is not a benchmark (upstream's
-  `dodge_benchmark.py` is), but it behaves like the policy in the paper, not like one
-  reading a broken image. In headless Chromium it stands between throws, braces and
-  sidesteps as the ball arrives, and resets when one connects; the walk policy walks
-  upright for 24 s at the default 0.5 m/s. No console errors either way.
+Fed these observations in a live mjlab env, the dodge checkpoint stays upright through 30 s
+of throws — base height 0.72 m on average, never below 0.51 — and is hit once in roughly
+twelve throws. One rollout is not a benchmark (upstream's `dodge_benchmark.py` is), but it
+behaves like the policy in the paper, not like one reading a broken image. In headless
+Chromium it stands between throws, braces and sidesteps as the ball arrives, and resets
+when one connects; the walk policy walks upright for 24 s at the default 0.5 m/s.
