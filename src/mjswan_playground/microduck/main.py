@@ -94,6 +94,9 @@ class _Demo:
     observation graph to ``obs/<group>.onnx``, one path for every policy on the scene, so
     policies reading different command slots would overwrite each other's. The nine need
     five layouts, hence nine scenes off four specs: upstream's three XMLs, kick mirrored.
+
+    TODO: mjswan is reworking how fused graphs are keyed. Once that lands, collapse this
+    into one scene per XML carrying several policies each.
     """
 
     name: str
