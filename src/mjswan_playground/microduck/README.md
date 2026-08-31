@@ -14,23 +14,21 @@ each gets its own scene, for the reason under
 ## Run
 
 ```sh
-uv run mjswan-playground run microduck
+uv run msp run microduck
 ```
 
-The build clones both repositories into `.cache/` at pinned commits; set
-`MJSWAN_MICRODUCK_RL_ROOT` / `MJSWAN_MICRODUCK_ROOT` to point at checkouts you already
-have.
+The build clones both repositories into `.cache/` at pinned commits.
 
 | From upstream | Used as |
 |---|---|
 | `robot/microduck/scene.xml`, `scene_rollers.xml`, `scene_ball.xml` | the scenes — MJCF as exported from Onshape, `<position>` actuators and all |
-| its `STAND` keyframe | the reset pose, the default the actions offset from, and what `joint_pos_rel` subtracts (upstream's `DEFAULT_POSE`) |
+| its `STAND` keyframe | the reset pose, what actions offset from, and what `joint_pos_rel` subtracts (upstream's `DEFAULT_POSE`) |
 | the actuator block's joint order | `policy_joint_names` — the 14 servos in the order the runtime indexes them |
 | `policies/*.onnx` (9 files, from the robot's repo) | the policies, normalizers baked in, exactly the files `robotd` loads |
 | the env configs' command ranges and terminations | the slider bounds and the fall reset, per policy |
 | `scripts/infer_policy.py` | the reference: the same ONNX files driven against the same XML in plain MuJoCo |
 
-## The nine
+## The nine policies
 
 | Scene | Policy | Twist slot (3) | Head (4) | Body (6) | Resets on a 70° tilt |
 |---|---|---|---|---|---|
@@ -50,11 +48,11 @@ padding is what lets one runtime swap any of these in.
 
 ## What the policies read
 
-All nine are `obs[1, 61] -> actions[1, 14]`, no history:
+All nine are `obs[1, 61] -> actions[1, 14]`, no history, every term at `scale=1.0`:
 
 | Term | Width | Source |
 |---|---|---|
-| `base_ang_vel` | 3 | `root_link_ang_vel_b` |
+| `base_ang_vel` | 3 | `root_link_ang_vel_b`, where upstream reads a `gyro` on the `imu` site — that site is on the root body at identity rotation, and the two agree to `9.7e-07` over 24 randomized states |
 | `projected_gravity` | 3 | `projected_gravity_b` |
 | `joint_pos` | 14 | `joint_pos_rel`, against the `STAND` pose |
 | `joint_vel` | 14 | `joint_vel_rel` |
@@ -69,42 +67,47 @@ browser reads them.
 ## Why the scenes are XML, not an mjlab task
 
 Unlike [`pacman`](../pacman/README.md) and [`wbc`](../wbc/README.md), this task does not
-import upstream's env configs. Every one of them drives the robot through
-[BAM](https://github.com/Rhoban/bam): the position actuators are swapped for torque motors
-and a torch `compute()` supplies the XL330's voltage control law, friction and command
-delay. The browser has no counterpart, and mjswan resolves PD gains off
-`IdealPdActuatorCfg` alone, which `BamActuatorCfg` is not.
+import upstream's env configs, because every one of them drives the robot through
+[BAM](https://github.com/Rhoban/bam) instead of a MuJoCo actuator
+(`FrictionDRBamActuatorCfg`, a fitted XL330 "m6" model). BAM swaps the XML's `<position>`
+actuators for torque motors, zeroes `dof_frictionloss`, and computes each step in torch:
+a firmware position loop (`kp_fw` 200) whose demand is limited by the voltage actually
+available — a per-env battery of 6.5–8.2 V, less a load-dependent sag of up to
+`0.2·Σ|τ|`, floored at 6.0 V — then a friction budget subtracted off the result (Coulomb
++ Stribeck + load-dependent + viscous), all behind a 3–6 step command delay. The browser
+has no counterpart, and mjswan resolves PD gains off `IdealPdActuatorCfg` alone, which
+`BamActuatorCfg` is not.
 
-But BAM is a training-time model. The MJCF already carries the position actuators the real
-servos' firmware runs, and upstream's own `infer_policy.py` drives these exact ONNX files
-against these exact XMLs in plain CPU MuJoCo. That is the deployment this task reproduces,
-so the scenes compile from the XML — [`husky`](../husky/README.md)'s shape, not pacman's.
-It also means the pinned `mjlab` version never has to agree with upstream's.
+But BAM is a training-time model. The MJCF already carries the position actuators the
+real servos' firmware runs, and upstream's own `infer_policy.py` drives these exact ONNX
+files against these exact XMLs in plain CPU MuJoCo. That is the deployment this task
+reproduces, so the scenes compile from the XML — [`husky`](../husky/README.md)'s shape,
+not pacman's. It also means the pinned `mjlab` version never has to agree with upstream's.
 
 ## What differs from upstream
 
-- **One policy per scene.** mjswan writes a scene's fused observation graph to
-  `obs/<group>.onnx`, one path for every policy on the scene, so policies reading
-  different command slots would overwrite each other's. The nine need five layouts, hence
-  nine scenes off four specs: upstream's three XMLs, the kick one mirrored per foot.
-- **The actuator is the XML's, not BAM's** — see above. The joint `damping` (0.053),
+- **One policy per scene.** mjswan writes a scene's fused observation graph to one
+  `obs/<group>.onnx`, so policies reading different command slots would overwrite each
+  other's. The nine need five layouts, hence nine scenes off four specs: upstream's three
+  XMLs, the kick one mirrored per foot.
+- **The actuator is the XML's, not BAM's** — above. The joint `damping` (0.053),
   `frictionloss` (0.0048) and `armature` (0.0018) stay as exported; under BAM the first
   two are zeroed and recomputed in torch.
 - **No domain randomization, no episode timeout.** Voltage sag, command delay, friction,
   CoM offsets, encoder bias and pushes are all training-time, and none is applied by the
-  robot either; upstream's 20 s episode budget means nothing to an interactive demo. The
-  70° fall reset is upstream's own `fell_over`, kept on the policies upstream keeps it on.
+  robot either; a 20 s episode budget means nothing to an interactive demo. The 70° fall
+  reset is upstream's own `fell_over`, kept on the policies upstream keeps it on.
 - **A padded slot reads zero**, where upstream resamples a narrow "keep the input neurons
-  alive" range in it — ±5 mm / ±0.05 rad of body pose, ±0.01 m/s of twist. Zero is inside
-  every one of those ranges.
+  alive" range — ±5 mm / ±0.05 rad of body pose, ±0.01 m/s of twist. Zero is inside every
+  one of those.
 - **The pick and crouch clock never exits.** Upstream's runtime runs the cycle to phase
   0.7 and hands back to walking; here it keeps turning, which is what the training command
   itself does (`phase = (phase + dt / period) % 1`).
 - **The kick ball is placed, not jittered**, at `(0.08, ∓0.042)` — the placement
-  `reset_ball_in_front_of_foot`'s docstring derives, not its `offset` default of 0.09. That
-  default is only the centre of a ±15 mm per-axis draw, the randomization that makes a
-  ball-blind swing robust rather than aimed; a scene bakes one placement, and at 0.09 the
-  right-foot swing passes a stationary ball.
+  `reset_ball_in_front_of_foot`'s docstring derives, not its `offset` default of 0.09.
+  That default is only the centre of a ±15 mm per-axis draw, the randomization that makes
+  a ball-blind swing robust rather than aimed; a scene bakes one placement, and at 0.09
+  the right-foot swing passes a stationary ball.
 - **The roller heading slider is `infer_policy.py`'s ±1.0 rad**, not the pinned env
   config's clip to 0 ("straight-line focus") — the shipped `roller.onnx` predates that
   config. It defaults to 0.
@@ -116,40 +119,24 @@ It also means the pinned `mjlab` version never has to agree with upstream's.
 
 ## Provenance of the checkpoints
 
-The names are **roles**, not runs. The nine files are vendored into the robot's repo from
+The names are **roles**, not runs. The nine files were vendored into the robot's repo from
 `apirrone/microduck_runtime` at commit `5f3b314`, dereferencing symlinks that pointed at
-particular training runs (`alpha_walking.onnx` was `BEST_alpha_walking_rough.onnx`), and
-which env config each was trained against is not recorded upstream. The pairings in the
-table above are read off those names, the deploy repo's own role table and what
-`infer_policy.py` loads each one as — not off a training manifest. What *is* documented and
-version-checked at load by `robotd` is the 61-value observation contract, and that is what
-this task builds.
+particular training runs (`alpha_walking.onnx` was `BEST_alpha_walking_rough.onnx`); which
+env config each was trained against is not recorded upstream. The pairings above are read
+off those names, the deploy repo's own role table and what `infer_policy.py` loads each
+one as — not off a training manifest. What *is* documented and version-checked at load by
+`robotd` is the 61-value observation contract, and that is what this task builds.
 
 Four registered task families ship no checkpoint at all (Swizzle, RollerSlope,
 RollerStandUp, Spin), as do all fifteen Backlash variants; they are absent for that reason.
 
-## Fidelity
-
-- **The articulation**: the default pose matches `infer_policy.py`'s `DEFAULT_POSE` to
-  `4e-05` — upstream rounds its copy to four decimals, this one is read out of the
-  keyframe — and the joint order is identical to the order upstream's runtime indexes.
-- **The observation** traces to exactly 61 values and **the action** to 14, every term at
-  `scale=1.0`. `base_ang_vel` reads mjlab's `root_link_ang_vel_b` where upstream reads a
-  `gyro` on the `imu` site: that site is on the root body at identity rotation, and over 24
-  randomized states the two agree to `9.7e-07`.
-- **Behavior**, each policy in plain CPU MuJoCo from the `STAND` reset: sit settles at
-  0.062 m against upstream's `sit_z` of 0.060, the pick puts its mouth at the floor, the
-  roulade rolls through 164° and lands upright, either kick sends the ball 3–4 m, the
-  roller skates 4.4 m in 12 s. No NaNs, and nothing falls that is not meant to.
-- **In headless Chromium** all nine scenes run 15 s with no page or console errors, each
-  showing exactly the controls its policy drives and nothing else. The bundle is 45 data
-  files / 73 MB / 7.8 MB largest, inside mjswan Cloud's limits.
+## The one known gap
 
 **The walk tracks its command loosely** — a deadband to ≈0.25 m/s, then roughly 40% of
 command; turning is the same shape. The observation, the joint order, the action scale and
-the control rate each check out above, and this is upstream's own inference control path,
-so it is the checkpoint under this actuator rather than a wiring fault. What it is not is
-BAM, which is what the policy trained against, and at this scale upstream puts most of the
+the control rate each check out, and this is upstream's own inference control path, so it
+is the checkpoint under this actuator rather than a wiring fault. What it is not is BAM,
+which is what the policy trained against, and at this scale upstream puts most of the
 sim-to-real gap in exactly that.
 
 ## License
@@ -158,5 +145,8 @@ The code and the policies are Apache-2.0. **The 3D model files are not**: `micro
 licenses them under Creative Commons **BY-SA-NC**, and they are 21 MB of the 26 MB of STL
 this task compiles into each `scene.mjz`. NonCommercial and ShareAlike both bear on
 redistributing that bundle — publishing it to a host, mjswan Cloud included — in a way
-Apache-2.0 upstream assets do not. Building and running locally is what this directory
-supports; clear the publication question with the authors first.
+Apache-2.0 upstream assets do not. The microduck scenes already on mjswan Cloud are up
+there under permission granted directly by the author
+([@antoinepirrone](https://x.com/antoinepirrone/status/2093233465483292889)); that
+permission does not travel with the files, so publish your own copy only under the terms
+of the license.

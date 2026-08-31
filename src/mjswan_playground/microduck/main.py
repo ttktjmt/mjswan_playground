@@ -179,7 +179,6 @@ def _resolve_rl_root() -> Path:
         url=RL_REPO_URL,
         commit=RL_REPO_COMMIT,
         marker=SCENE_XML,
-        root_env_var="MJSWAN_MICRODUCK_RL_ROOT",
     )
 
 
@@ -189,7 +188,6 @@ def _resolve_deploy_root() -> Path:
         url=DEPLOY_REPO_URL,
         commit=DEPLOY_REPO_COMMIT,
         marker=f"{POLICY_DIR}/alpha_walking.onnx",
-        root_env_var="MJSWAN_MICRODUCK_ROOT",
     )
 
 
