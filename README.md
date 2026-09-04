@@ -10,6 +10,7 @@ A collection of tasks built with [mjswan](https://github.com/ttktjmt/mjswan).
 | [`wbc`](src/mjswan_playground/wbc/README.md) | Unitree G1 | One [wbc-mjlab](https://github.com/wbc-mjlab/wbc-mjlab) tracking policy over various motions | [mjswan.com/s/XWwo7dV](https://mjswan.com/s/XWwo7dV) |
 | [`pacman`](src/mjswan_playground/pacman/README.md) | Unitree G1 | Dodging thrown balls from a head depth camera ([PAC-MAN](https://lzyang2000.github.io/perceptive_cbf_rl/), 2026) | [mjswan.com/s/GOTofiq](https://mjswan.com/s/GOTofiq) |
 | [`microduck`](src/mjswan_playground/microduck/README.md) | Microduck | Every policy the robot ships: walk, stand, sit, ground pick, ball kick, roulade, roller skate ([Microduck](https://github.com/pollen-robotics/microduck)) | [mjswan.com/s/DOGILsh](https://mjswan.com/s/DOGILsh) |
+| [`musclemimic`](src/mjswan_playground/musclemimic/README.md) | MyoFullBody | A 354-muscle body tracking a walking clip with the public 2.05e9-step checkpoint ([MuscleMimic](https://github.com/amathislab/musclemimic), 2026) | — |
 
 ## CLI
 
