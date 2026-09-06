@@ -1,4 +1,4 @@
-"""Microduck: the nine policies the robot ships, each in the scene it runs in.
+"""Microduck: the nine policies the robot ships, on the four scenes they run in.
 
 The robot XMLs already carry the position actuators the real servos run, so the scenes
 compile straight from them rather than from upstream's training envs. See ``README.md``.
@@ -7,7 +7,9 @@ compile straight from them rather than from upstream's training envs. See ``READ
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 
 import mjswan
@@ -73,100 +75,120 @@ BALL_RADIUS = 0.035
 #: that start or end on the ground.
 FELL_OVER_ANGLE_DEG = 70.0
 
-#: Final command ranges the curricula reach — what a finished policy has seen.
-TWIST_RANGES = ((-0.4, 0.4), (-0.3, 0.3), (-1.0, 1.0))
-ROLLER_THROTTLE_RANGE = (-0.5, 0.6)
+#: The final command ranges the curricula reach — what a finished policy has seen — as
+#: the sliders that drive them: ``(name, label, range)``.
+TWIST_SLIDERS = (
+    ("lin_vel_x", "Forward (m/s)", (-0.4, 0.4)),
+    ("lin_vel_y", "Sideways (m/s)", (-0.3, 0.3)),
+    ("ang_vel_z", "Turn (rad/s)", (-1.0, 1.0)),
+)
+THROTTLE_SLIDERS = (("lin_vel_x", "Forward (m/s)", (-0.5, 0.6)),)
 #: ``infer_policy.py``'s deploy range for the heading slot; see README.
-ROLLER_HEADING_RANGE = (-1.0, 1.0)
-HEAD_RANGES = ((-1.10, 1.10), (-1.10, 1.10), (-1.40, 1.40), (-0.31, 0.31))
-HEAD_LABELS = ("Neck Pitch", "Head Pitch", "Head Yaw", "Head Roll")
-#: Only z / roll / pitch are steerable; x, y and yaw are alive-range noise upstream never
-#: trains as a command, so they are padded with the zero they were centred on.
-BODY_Z_RANGE = (-0.04, 0.030)
-BODY_ANGLE_RANGE = (-math.radians(15), math.radians(15))
+HEADING_SLIDERS = (("heading_error", "Error (rad)", (-1.0, 1.0)),)
+HEAD_SLIDERS = (
+    ("neck_pitch", "Neck Pitch", (-1.10, 1.10)),
+    ("head_pitch", "Head Pitch", (-1.10, 1.10)),
+    ("head_yaw", "Head Yaw", (-1.40, 1.40)),
+    ("head_roll", "Head Roll", (-0.31, 0.31)),
+)
+_TILT = math.radians(15)
+#: Only z / roll / pitch are steerable; the body slot's x, y and yaw are alive-range noise
+#: upstream never trains as a command, so they are padded with the zero they centre on.
+BODY_SLIDERS = (
+    ("z", "Trunk Height (m)", (-0.04, 0.030)),
+    ("roll", "Trunk Roll (rad)", (-_TILT, _TILT)),
+    ("pitch", "Trunk Pitch (rad)", (-_TILT, _TILT)),
+)
+
+#: Trace-time widths for the commands the browser owns. One table for every scene: the
+#: tracer only resolves the names a policy's own terms read, so a spare entry costs
+#: nothing. The phase clock is traced for real, but the term reading it still resolves
+#: its name against the trace env — as husky's does.
+TRACE_COMMAND_WIDTHS = {
+    "twist": 3,
+    "throttle": 1,
+    "heading": 1,
+    "posture": 1,
+    "head_pose": 4,
+    "body_pose": 3,
+}
 
 
 @dataclass(frozen=True)
-class _Demo:
-    """One shipped checkpoint, the scene it runs in, and what drove each command slot.
-
-    One policy per scene, not one per model file: mjswan 0.9.3 writes a scene's fused
-    observation graph to ``obs/<group>.onnx``, one path for every policy on the scene, so
-    policies reading different command slots would overwrite each other's. The nine need
-    five layouts, hence nine scenes off four specs: upstream's three XMLs, kick mirrored.
-
-    TODO: mjswan is reworking how fused graphs are keyed. Once that lands, collapse this
-    into one scene per XML carrying several policies each.
-    """
+class _Policy:
+    """One shipped checkpoint, and what drives each of its command slots."""
 
     name: str
     onnx: str
-    xml: str
     twist: str
     """Which of five shapes upstream put in this policy's twist slot: ``"velocity"``,
     ``"heading"``, ``"posture"``, ``"phase"`` or ``"zero"``."""
     head: bool = False
     body: bool = False
     fell_over: bool = True
+
+
+@dataclass(frozen=True)
+class _Scene:
+    """One upstream XML, and the policies that run in it.
+
+    Nine policies over four scenes: mjswan traces each policy's terms into its own
+    ``mdp/<policy>/``, so they only need splitting where the *scene* differs — wheels,
+    or a ball baked in at one of two placements.
+    """
+
+    name: str
+    xml: str
+    policies: tuple[_Policy, ...]
     root_height: float = STAND_HEIGHT
     wheels: bool = False
     ball_y: float | None = None
-    trace_xml: str | None = None
-    """The spec tracing runs against, when it cannot be the scene's own. Only the kick
-    scenes need it: an mjlab ``Entity`` is one freejoint and theirs holds a second for the
-    ball, which no policy reads anyway."""
 
 
-DEMOS = (
-    _Demo("Walk", "alpha_walking.onnx", SCENE_XML, "velocity", head=True),
-    _Demo(
-        "Stand & Pose",
-        "alpha_stand.onnx",
+SCENES = (
+    _Scene(
+        "Duck",
         SCENE_XML,
-        "zero",
-        head=True,
-        body=True,
-        fell_over=False,
+        (
+            _Policy("Walk", "alpha_walking.onnx", "velocity", head=True),
+            _Policy(
+                "Stand & Pose",
+                "alpha_stand.onnx",
+                "zero",
+                head=True,
+                body=True,
+                fell_over=False,
+            ),
+            _Policy(
+                "Sit / Stand",
+                "alpha_sitstand.onnx",
+                "posture",
+                head=True,
+                fell_over=False,
+            ),
+            _Policy("Ground Pick", "alpha_ground_pick.onnx", "phase"),
+            _Policy("Roulade", "roulade.onnx", "zero", fell_over=False),
+        ),
     ),
-    _Demo(
-        "Sit / Stand",
-        "alpha_sitstand.onnx",
-        SCENE_XML,
-        "posture",
-        head=True,
-        fell_over=False,
-    ),
-    _Demo("Ground Pick", "alpha_ground_pick.onnx", SCENE_XML, "phase"),
-    _Demo("Roulade", "roulade.onnx", SCENE_XML, "zero", fell_over=False),
-    _Demo(
-        "Ball Kick (right)",
-        "ball_kick_right.onnx",
+    _Scene(
+        "Ball (right foot)",
         SCENE_BALL_XML,
-        "zero",
+        (_Policy("Kick", "ball_kick_right.onnx", "zero"),),
         ball_y=-BALL_OFFSET_ABS_Y,
-        trace_xml=SCENE_XML,
     ),
-    _Demo(
-        "Ball Kick (left)",
-        "ball_kick_left.onnx",
+    _Scene(
+        "Ball (left foot)",
         SCENE_BALL_XML,
-        "zero",
+        (_Policy("Kick", "ball_kick_left.onnx", "zero"),),
         ball_y=BALL_OFFSET_ABS_Y,
-        trace_xml=SCENE_XML,
     ),
-    _Demo(
-        "Roller Skate",
-        "roller.onnx",
+    _Scene(
+        "Rollers",
         SCENE_ROLLERS_XML,
-        "heading",
-        root_height=ROLLERS_STAND_HEIGHT,
-        wheels=True,
-    ),
-    _Demo(
-        "Roller Crouch",
-        "roller_crouch.onnx",
-        SCENE_ROLLERS_XML,
-        "phase",
+        (
+            _Policy("Skate", "roller.onnx", "heading"),
+            _Policy("Crouch", "roller_crouch.onnx", "phase"),
+        ),
         root_height=ROLLERS_STAND_HEIGHT,
         wheels=True,
     ),
@@ -222,14 +244,20 @@ def _stand_pose(scene_xml: Path) -> dict[str, float]:
     }
 
 
+def _free_joint_adr(model: mujoco.MjModel, name: str) -> slice:
+    joint = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name)
+    if joint < 0:
+        raise ValueError(f"No joint named {name!r} in the compiled scene.")
+    start = int(model.jnt_qposadr[joint])
+    return slice(start, start + 7)
+
+
 def _scene_spec(
-    scene_xml: Path,
+    scene: _Scene,
+    rl_root: Path,
     stand_pose: dict[str, float],
     *,
-    root_height: float,
-    wheels: bool,
-    ball_y: float | None,
-    sim_options: bool = True,
+    tracing: bool = False,
 ) -> mujoco.MjSpec:
     """The scene as the browser compiles it: upstream's solver settings (the XMLs carry
     no ``<option>``), the wheel friction its inference script writes by hand, and one
@@ -238,16 +266,22 @@ def _scene_spec(
     STAND has to be the *only* keyframe: the browser resets to the first one, and so does
     the tracing env, whose ``default_joint_pos`` ``joint_pos_rel`` bakes in. Upstream's
     INIT first would pose every policy against a zero it never trained on.
+
+    ``tracing`` builds the variant the ONNX tracer runs against instead: no sim options,
+    since the scene's own win that conflict and nothing traced reads them, and no ball,
+    since an mjlab ``Entity`` is one freejoint and a ball scene holds a second.
     """
-    spec = mujoco.MjSpec.from_file(str(scene_xml))
-    if sim_options:
-        # Left off the tracing spec, whose own scene's options win the conflict anyway;
-        # nothing traced depends on them.
+    xml, ball_y = scene.xml, scene.ball_y
+    if tracing and ball_y is not None:
+        xml, ball_y = SCENE_XML, None
+
+    spec = mujoco.MjSpec.from_file(str(rl_root / xml))
+    if not tracing:
         spec.option.timestep = TIMESTEP
         spec.option.integrator = INTEGRATOR
         spec.option.iterations = SOLVER_ITERATIONS
         spec.option.ls_iterations = SOLVER_LS_ITERATIONS
-    if wheels:
+    if scene.wheels:
         for joint in spec.joints:
             if joint.name.startswith("passive_"):
                 joint.frictionloss = WHEEL_FRICTIONLOSS
@@ -257,7 +291,7 @@ def _scene_spec(
     qpos[_free_joint_adr(model, ROOT_JOINT)] = [
         0.0,
         0.0,
-        root_height,
+        scene.root_height,
         1.0,
         0.0,
         0.0,
@@ -285,15 +319,9 @@ def _scene_spec(
     return spec
 
 
-def _free_joint_adr(model: mujoco.MjModel, name: str) -> slice:
-    joint = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name)
-    if joint < 0:
-        raise ValueError(f"No joint named {name!r} in the compiled scene.")
-    start = int(model.jnt_qposadr[joint])
-    return slice(start, start + 7)
-
-
-def _sliders(specs: list[tuple[str, str, tuple[float, float]]]) -> mjswan.CommandInput:
+def _sliders(
+    specs: Iterable[tuple[str, str, tuple[float, float]]],
+) -> mjswan.CommandInput:
     return mjswan.ui_command(
         [
             mjswan.SliderConfig(
@@ -308,159 +336,102 @@ def _sliders(specs: list[tuple[str, str, tuple[float, float]]]) -> mjswan.Comman
     )
 
 
-def _twist_commands(kind: str) -> dict[str, mjswan.CommandInput]:
-    """The browser-side command terms this policy's twist slot needs, if any. A slot
-    upstream pinned to zero gets no command — it is padded in the observation instead."""
+def _driven(command_name: str) -> ObservationTermCfg:
+    """Slots the browser's command fills."""
+    return ObservationTermCfg(
+        func=obs_fns.generated_commands, params={"command_name": command_name}
+    )
+
+
+def _padded(dim: int) -> ObservationTermCfg:
+    """Slots nothing drives: upstream's ``zero_command_padding``, which is what keeps one
+    runtime able to swap any of these policies in."""
+    return ObservationTermCfg(func=terms.zeros, params={"dim": dim})
+
+
+def _twist(
+    kind: str,
+) -> tuple[dict[str, mjswan.CommandInput], dict[str, ObservationTermCfg]]:
+    """The commands this policy's twist slot needs and the three values they fill."""
     if kind == "velocity":
-        return {
-            "twist": _sliders(
-                [
-                    ("lin_vel_x", "Forward (m/s)", TWIST_RANGES[0]),
-                    ("lin_vel_y", "Sideways (m/s)", TWIST_RANGES[1]),
-                    ("ang_vel_z", "Turn (rad/s)", TWIST_RANGES[2]),
-                ]
-            )
-        }
+        return {"twist": _sliders(TWIST_SLIDERS)}, {"twist": _driven("twist")}
     if kind == "heading":
-        return {
-            # Two commands, not one: the middle slot is padding — see `_twist_terms`.
-            "throttle": _sliders(
-                [("lin_vel_x", "Forward (m/s)", ROLLER_THROTTLE_RANGE)]
-            ),
-            "heading": _sliders(
-                [("heading_error", "Error (rad)", ROLLER_HEADING_RANGE)]
-            ),
-        }
+        # Two commands, not one: `lin_vel_y` is the middle slot, which upstream's roller
+        # env pins to (0, 0).
+        return (
+            {
+                "throttle": _sliders(THROTTLE_SLIDERS),
+                "heading": _sliders(HEADING_SLIDERS),
+            },
+            {
+                "throttle": _driven("throttle"),
+                "lin_vel_y": _padded(1),
+                "heading": _driven("heading"),
+            },
+        )
     if kind == "posture":
-        return {
-            "posture": mjswan.ui_command(
-                [mjswan.CheckboxConfig(name="sit", label="Sit", default=False)]
-            )
-        }
+        return (
+            {
+                "posture": mjswan.ui_command(
+                    [mjswan.CheckboxConfig(name="sit", label="Sit", default=False)]
+                )
+            },
+            {"posture": _driven("posture"), "twist_pad": _padded(2)},
+        )
     if kind == "phase":
-        return {"twist": terms.GroundPickPhaseCommandCfg(control_dt=CONTROL_DT)}
+        return (
+            {"twist": terms.GroundPickPhaseCommandCfg(control_dt=CONTROL_DT)},
+            {"twist": _driven("twist")},
+        )
     if kind != "zero":
         raise ValueError(f"Unknown twist kind {kind!r}")
-    return {}
+    return {}, {"twist": _padded(3)}
 
 
-def _twist_terms(kind: str) -> dict[str, ObservationTermCfg]:
-    """The three twist values, in order, from whatever drives them."""
-    generated = obs_fns.generated_commands
-    if kind in ("velocity", "phase"):
-        return {
-            "twist": ObservationTermCfg(
-                func=generated, params={"command_name": "twist"}
-            )
-        }
-    if kind == "heading":
-        # `lin_vel_y` is the middle slot, pinned to (0, 0) by upstream's roller env.
-        return {
-            "throttle": ObservationTermCfg(
-                func=generated, params={"command_name": "throttle"}
-            ),
-            "lin_vel_y": ObservationTermCfg(func=terms.zeros, params={"dim": 1}),
-            "heading": ObservationTermCfg(
-                func=generated, params={"command_name": "heading"}
-            ),
-        }
-    if kind == "posture":
-        return {
-            "posture": ObservationTermCfg(
-                func=generated, params={"command_name": "posture"}
-            ),
-            "twist_pad": ObservationTermCfg(func=terms.zeros, params={"dim": 2}),
-        }
-    return {"twist": ObservationTermCfg(func=terms.zeros, params={"dim": 3})}
-
-
-def _pose_commands(policy: _Demo) -> dict[str, mjswan.CommandInput]:
+def _pose(
+    policy: _Policy,
+) -> tuple[dict[str, mjswan.CommandInput], dict[str, ObservationTermCfg]]:
+    """The head (4) and body (6) slots, driven where this policy steers them."""
     commands: dict[str, mjswan.CommandInput] = {}
     if policy.head:
-        commands["head_pose"] = _sliders(
-            [
-                (name, label, value_range)
-                for name, label, value_range in zip(
-                    ("neck_pitch", "head_pitch", "head_yaw", "head_roll"),
-                    HEAD_LABELS,
-                    HEAD_RANGES,
-                )
-            ]
-        )
+        commands["head_pose"] = _sliders(HEAD_SLIDERS)
+    obs = {"head_command": _driven("head_pose") if policy.head else _padded(4)}
     if policy.body:
-        commands["body_pose"] = _sliders(
-            [
-                ("z", "Trunk Height (m)", BODY_Z_RANGE),
-                ("roll", "Trunk Roll (rad)", BODY_ANGLE_RANGE),
-                ("pitch", "Trunk Pitch (rad)", BODY_ANGLE_RANGE),
-            ]
-        )
-    return commands
-
-
-def _pose_terms(policy: _Demo) -> dict[str, ObservationTermCfg]:
-    generated = obs_fns.generated_commands
-    pose: dict[str, ObservationTermCfg] = {}
-    if policy.head:
-        pose["head_command"] = ObservationTermCfg(
-            func=generated, params={"command_name": "head_pose"}
-        )
+        commands["body_pose"] = _sliders(BODY_SLIDERS)
+        # [x, y, z, roll, pitch, yaw] — see `BODY_SLIDERS`.
+        obs["body_xy"] = _padded(2)
+        obs["body_command"] = _driven("body_pose")
+        obs["body_yaw"] = _padded(1)
     else:
-        pose["head_command"] = ObservationTermCfg(func=terms.zeros, params={"dim": 4})
-    if policy.body:
-        # [x, y, z, roll, pitch, yaw]: x, y and yaw are not commands upstream trains, so
-        # they stay at the zero their alive-range is centred on.
-        pose["body_xy"] = ObservationTermCfg(func=terms.zeros, params={"dim": 2})
-        pose["body_command"] = ObservationTermCfg(
-            func=generated, params={"command_name": "body_pose"}
-        )
-        pose["body_yaw"] = ObservationTermCfg(func=terms.zeros, params={"dim": 1})
-    else:
-        pose["body_command"] = ObservationTermCfg(func=terms.zeros, params={"dim": 6})
-    return pose
+        obs["body_command"] = _padded(6)
+    return commands, obs
 
 
-def _observations(policy: _Demo, joints: SceneEntityCfg) -> ObservationGroupCfg:
-    """The 61 values ``robotd`` builds, in its order: 3 gyro + 3 gravity + 14 joint
-    positions + 14 joint velocities + 14 last actions + a 13-wide command block."""
-    group: dict[str, ObservationTermCfg] = {
-        # Upstream's gyro sits on an identity-oriented site on the root body, so it
-        # reads exactly this.
-        "base_ang_vel": ObservationTermCfg(func=obs_fns.base_ang_vel),
-        "projected_gravity": ObservationTermCfg(func=obs_fns.projected_gravity),
-        "joint_pos": ObservationTermCfg(
-            func=obs_fns.joint_pos_rel, params={"asset_cfg": joints}
-        ),
-        "joint_vel": ObservationTermCfg(
-            func=obs_fns.joint_vel_rel, params={"asset_cfg": joints}
-        ),
-        "actions": ObservationTermCfg(func=obs_fns.last_action),
-    }
-    group.update(_twist_terms(policy.twist))
-    group.update(_pose_terms(policy))
-    return ObservationGroupCfg(terms=group)
-
-
-def _trace_commands(policy: _Demo) -> dict[str, object]:
-    """Trace-time widths for the commands the browser owns."""
-    widths = {
-        "velocity": {"twist": 3},
-        # The clock is traced for real, but the term reading it still resolves its name
-        # against the trace env — as husky's does.
-        "phase": {"twist": 3},
-        "heading": {"throttle": 1, "heading": 1},
-    }
-    stand_ins: dict[str, object] = {
-        name: terms.CommandValues(width)
-        for name, width in widths.get(policy.twist, {}).items()
-    }
-    if policy.twist == "posture":
-        stand_ins["posture"] = terms.CommandValues(1)
-    if policy.head:
-        stand_ins["head_pose"] = terms.CommandValues(4)
-    if policy.body:
-        stand_ins["body_pose"] = terms.CommandValues(3)
-    return stand_ins
+def _mdp(
+    policy: _Policy, joints: SceneEntityCfg
+) -> tuple[dict[str, mjswan.CommandInput], ObservationGroupCfg]:
+    """The policy's control panel, and the 61 values ``robotd`` builds in its order: 3
+    gyro + 3 gravity + 14 joint positions + 14 joint velocities + 14 last actions + a
+    13-wide command block."""
+    twist_commands, twist_obs = _twist(policy.twist)
+    pose_commands, pose_obs = _pose(policy)
+    return {**twist_commands, **pose_commands}, ObservationGroupCfg(
+        terms={
+            # Upstream's gyro sits on an identity-oriented site on the root body, so it
+            # reads exactly this.
+            "base_ang_vel": ObservationTermCfg(func=obs_fns.base_ang_vel),
+            "projected_gravity": ObservationTermCfg(func=obs_fns.projected_gravity),
+            "joint_pos": ObservationTermCfg(
+                func=obs_fns.joint_pos_rel, params={"asset_cfg": joints}
+            ),
+            "joint_vel": ObservationTermCfg(
+                func=obs_fns.joint_vel_rel, params={"asset_cfg": joints}
+            ),
+            "actions": ObservationTermCfg(func=obs_fns.last_action),
+            **twist_obs,
+            **pose_obs,
+        }
+    )
 
 
 def setup_builder() -> mjswan.Builder:
@@ -471,34 +442,14 @@ def setup_builder() -> mjswan.Builder:
     builder = mjswan.Builder()
     project = builder.add_project(name="Microduck")
 
-    for index, demo in enumerate(DEMOS):
-
-        def spec_fn(demo: _Demo = demo) -> mujoco.MjSpec:
-            return _scene_spec(
-                rl_root / demo.xml,
-                stand_pose,
-                root_height=demo.root_height,
-                wheels=demo.wheels,
-                ball_y=demo.ball_y,
-            )
-
-        def trace_spec_fn(demo: _Demo = demo) -> mujoco.MjSpec:
-            return _scene_spec(
-                rl_root / (demo.trace_xml or demo.xml),
-                stand_pose,
-                root_height=demo.root_height,
-                wheels=demo.wheels,
-                ball_y=None if demo.trace_xml else demo.ball_y,
-                sim_options=False,
-            )
-
-        spec = spec_fn()
+    for entry in SCENES:
+        spec = _scene_spec(entry, rl_root, stand_pose)
         joint_names = _servo_joints(spec.compile())
         joints = SceneEntityCfg(
             name=ENTITY, joint_names=tuple(joint_names), preserve_order=True
         )
 
-        scene = project.add_scene(name=demo.name, spec=spec, control_dt=CONTROL_DT)
+        scene = project.add_scene(name=entry.name, spec=spec, control_dt=CONTROL_DT)
         scene.set_viewer(
             mjswan.ViewerConfig(
                 # Three-quarter view from the front: 25 cm of robot, and its face is
@@ -512,36 +463,42 @@ def setup_builder() -> mjswan.Builder:
         )
         scene.set_trace_env(
             build_single_entity_trace_env(
-                trace_spec_fn, entity_name=ENTITY, commands=_trace_commands(demo)
+                partial(_scene_spec, entry, rl_root, stand_pose, tracing=True),
+                entity_name=ENTITY,
+                commands={
+                    name: terms.CommandValues(width)
+                    for name, width in TRACE_COMMAND_WIDTHS.items()
+                },
             )
         )
 
-        terminations = {}
-        if demo.fell_over:
-            # `make_velocity_env_cfg`'s own, which upstream keeps for this task.
-            terminations["fell_over"] = TerminationTermCfg(
-                func=term_fns.bad_orientation,
-                params={"limit_angle": math.radians(FELL_OVER_ANGLE_DEG)},
-            )
-        scene.add_policy(
-            name=demo.name,
-            policy=onnx.load(str(deploy_root / POLICY_DIR / demo.onnx)),
-            commands={**_twist_commands(demo.twist), **_pose_commands(demo)},
-            observations=_observations(demo, joints),
-            actions={
-                # The XML's own `<position>` actuators: the browser reads their gains
-                # off the compiled model, so there is no PD to configure here.
-                "joint_pos": JointPositionActionCfg(
-                    entity_name="",
-                    actuator_names=(".*",),
-                    scale=1.0,
-                    use_default_offset=True,
+        for policy in entry.policies:
+            terminations = {}
+            if policy.fell_over:
+                # `make_velocity_env_cfg`'s own, which upstream keeps for this task.
+                terminations["fell_over"] = TerminationTermCfg(
+                    func=term_fns.bad_orientation,
+                    params={"limit_angle": math.radians(FELL_OVER_ANGLE_DEG)},
                 )
-            },
-            terminations=terminations,
-            policy_joint_names=joint_names,
-            default_joint_pos=[stand_pose[name] for name in joint_names],
-            default=index == 0,
-        )
+            commands, observations = _mdp(policy, joints)
+            scene.add_policy(
+                name=policy.name,
+                policy=onnx.load(str(deploy_root / POLICY_DIR / policy.onnx)),
+                commands=commands,
+                observations=observations,
+                actions={
+                    # The XML's own `<position>` actuators: the browser reads their gains
+                    # off the compiled model, so there is no PD to configure here.
+                    "joint_pos": JointPositionActionCfg(
+                        entity_name="",
+                        actuator_names=(".*",),
+                        scale=1.0,
+                        use_default_offset=True,
+                    )
+                },
+                terminations=terminations,
+                policy_joint_names=joint_names,
+                default_joint_pos=[stand_pose[name] for name in joint_names],
+            )
 
     return builder

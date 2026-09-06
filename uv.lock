@@ -1162,7 +1162,8 @@ wheels = [
 
 [[package]]
 name = "mjswan"
-source = { editable = "../mjswan" }
+version = "0.9.4"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mujoco" },
     { name = "nodeenv" },
@@ -1171,28 +1172,10 @@ dependencies = [
     { name = "typer" },
     { name = "wandb" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "gymnasium", marker = "extra == 'examples'" },
-    { name = "mjlab", marker = "extra == 'examples'", specifier = "==1.5.3" },
-    { name = "mujoco", specifier = "==3.8.1" },
-    { name = "myosuite", marker = "extra == 'examples'" },
-    { name = "nodeenv", specifier = ">=1.9.1" },
-    { name = "onnx", specifier = ">=1.20.0" },
-    { name = "onnxruntime", marker = "extra == 'examples'", specifier = ">=1.21.0" },
-    { name = "playground", marker = "extra == 'examples'", specifier = ">=0.1.0" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.3.2" },
-    { name = "pyright", marker = "extra == 'dev'", specifier = ">=1.1.407" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
-    { name = "rich", specifier = ">=13.0.0" },
-    { name = "robot-descriptions", marker = "extra == 'examples'", specifier = ">=1.22.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = "==0.16.0" },
-    { name = "torch", marker = "extra == 'examples'", specifier = ">=2.9.1" },
-    { name = "typer", specifier = ">=0.12.0" },
-    { name = "wandb", specifier = ">=0.23.1" },
+sdist = { url = "https://files.pythonhosted.org/packages/6c/de/462a15a1869573ffe6725db715e6dfe802ecdafb80062e7cbb50fb62b10c/mjswan-0.9.4.tar.gz", hash = "sha256:806ea5773b7981afb010e776e982a3b59c76fae394990a72735e05c9f30bd6f6", size = 23209148, upload-time = "2026-09-05T17:56:04.126Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8d/37/0e52b44c3b96f74a0c10ba6bcf899e645da73303b734e97a05259087adf4/mjswan-0.9.4-py3-none-any.whl", hash = "sha256:004c36687d7049a28ce287041b95003804cf053e5ab66d802882a12a2aa29545", size = 23518289, upload-time = "2026-09-05T17:56:00.693Z" },
 ]
-provides-extras = ["dev", "examples"]
 
 [[package]]
 name = "mjswan-playground"
@@ -1221,7 +1204,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "mjlab", specifier = "==1.5.3" },
-    { name = "mjswan", editable = "../mjswan" },
+    { name = "mjswan", specifier = ">=0.9.4" },
     { name = "onnx", specifier = ">=1.20.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "torch", specifier = ">=2.9.1" },
