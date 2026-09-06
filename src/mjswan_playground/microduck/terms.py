@@ -90,11 +90,3 @@ register_command(
     "GroundPickPhaseCommandCfg",
     CommandBinding(state_fields=["step_count", "phase_cmd"], command_field="phase_cmd"),
 )
-
-
-class CommandValues:
-    """Width-only stand-in for a command term: ``generated_commands`` traces against an
-    env with no command manager, and the runtime serves the live command browser-side."""
-
-    def __init__(self, width: int) -> None:
-        self.command = torch.zeros(1, width)

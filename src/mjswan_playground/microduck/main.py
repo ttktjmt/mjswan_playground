@@ -25,6 +25,7 @@ from mjswan.managers.termination_manager import TerminationTermCfg
 from mjswan.trace_env import build_single_entity_trace_env
 
 from mjswan_playground._deps import ensure_repo
+from mjswan_playground._trace import CommandValues
 
 from . import terms
 
@@ -466,7 +467,7 @@ def setup_builder() -> mjswan.Builder:
                 partial(_scene_spec, entry, rl_root, stand_pose, tracing=True),
                 entity_name=ENTITY,
                 commands={
-                    name: terms.CommandValues(width)
+                    name: CommandValues(width)
                     for name, width in TRACE_COMMAND_WIDTHS.items()
                 },
             )
