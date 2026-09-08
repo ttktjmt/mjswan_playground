@@ -4,12 +4,14 @@ A collection of tasks built with [mjswan](https://github.com/ttktjmt/mjswan).
 
 ## Tasks
 
-| Task ID | Robot | Description | Link |
-|---------|-------|-------------|------|
-| [`husky`](src/mjswan_playground/husky/README.md) | Unitree G1 | Skateboarding under whole-body control ([HUSKY](https://husky-humanoid.github.io/), RSS 2026) | [mjswan.com/s/oM-paPA](https://mjswan.com/s/oM-paPA) |
-| [`wbc`](src/mjswan_playground/wbc/README.md) | Unitree G1 | One [wbc-mjlab](https://github.com/wbc-mjlab/wbc-mjlab) tracking policy over various motions | [mjswan.com/s/XWwo7dV](https://mjswan.com/s/XWwo7dV) |
-| [`pacman`](src/mjswan_playground/pacman/README.md) | Unitree G1 | Dodging thrown balls from a head depth camera ([PAC-MAN](https://lzyang2000.github.io/perceptive_cbf_rl/), 2026) | [mjswan.com/s/GOTofiq](https://mjswan.com/s/GOTofiq) |
-| [`microduck`](src/mjswan_playground/microduck/README.md) | Microduck | Every policy the robot ships: walk, stand, sit, ground pick, ball kick, roulade, roller skate ([Microduck](https://github.com/pollen-robotics/microduck)) | [mjswan.com/s/DOGILsh](https://mjswan.com/s/DOGILsh) |
+| Task ID | Robot | Description | Preview & Link |
+|---------|-------|-------------|----------------|
+| [`husky`](src/mjswan_playground/husky/README.md) | Unitree G1 | Skateboarding under whole-body control ([HUSKY](https://husky-humanoid.github.io/), RSS 2026) | <a href="https://mjswan.com/s/oM-paPA"><img src="assets/husky.gif" width="200"/></a><br />[mjswan.com/s/oM-paPA](https://mjswan.com/s/oM-paPA) |
+| [`wbc`](src/mjswan_playground/wbc/README.md) | Unitree G1 | One [wbc-mjlab](https://github.com/wbc-mjlab/wbc-mjlab) tracking policy over various motions | <a href="https://mjswan.com/s/XWwo7dV"><img src="assets/wbc.gif" width="200"/></a><br />[mjswan.com/s/XWwo7dV](https://mjswan.com/s/XWwo7dV) |
+| [`pacman`](src/mjswan_playground/pacman/README.md) | Unitree G1 | Dodging thrown balls from a head depth camera ([PAC-MAN](https://lzyang2000.github.io/perceptive_cbf_rl/), 2026) | <a href="https://mjswan.com/s/GOTofiq"><img src="assets/pacman.gif" width="200"/></a><br />[mjswan.com/s/GOTofiq](https://mjswan.com/s/GOTofiq) |
+| [`microduck`](src/mjswan_playground/microduck/README.md) | Microduck | Every policy the robot ships: walk, stand, sit, ground pick, ball kick, roulade, roller skate ([Microduck](https://github.com/pollen-robotics/microduck)) | <a href="https://mjswan.com/s/DOGILsh"><img src="assets/microduck.gif" width="200"/></a><br />[mjswan.com/s/DOGILsh](https://mjswan.com/s/DOGILsh) |
+
+The previews are filmed from the built apps by [`scripts/record_preview.py`](scripts/record_preview.py) — one recipe per task, `--all` to re-record them.
 
 ## CLI
 

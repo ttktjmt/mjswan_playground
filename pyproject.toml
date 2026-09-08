@@ -48,6 +48,8 @@ override-dependencies = [
 
 [dependency-groups]
 dev = ["pytest>=9.0.2", "ruff==0.16.0"]
+# Only `scripts/record_preview.py` needs it, and it pulls a browser down with it.
+previews = ["playwright>=1.55"]
 
 [tool.ruff]
 lint.select = ["E", "F", "I"]
