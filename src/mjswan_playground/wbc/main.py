@@ -67,7 +67,6 @@ def setup_builder() -> mjswan.Builder:
         policy=onnx.load(str(deploy / POLICY_ONNX)),
         policy_joint_names=joint_names,
         default_joint_pos=[float(v) for v in contract["default_joint_pos"]],
-        default=True,
     )
 
     anchor = contract["tracking"]["anchor_body_name"]

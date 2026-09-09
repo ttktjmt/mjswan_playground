@@ -16,6 +16,7 @@ from mjswan.managers.termination_manager import TerminationTermCfg
 from mjswan.trace_env import build_single_entity_trace_env
 
 from mjswan_playground._deps import ensure_repo
+from mjswan_playground._trace import CommandValues
 
 from . import terms
 
@@ -136,8 +137,8 @@ def setup_builder() -> mjswan.Builder:
             lambda: _trace_spec(root / ROBOT_XML, default_joint_pos),
             entity_name=ENTITY,
             commands={
-                "skate": terms.CommandValues(2),  # push speed, heading
-                "phase": terms.CommandValues(1),
+                "skate": CommandValues(2),  # push speed, heading
+                "phase": CommandValues(1),
             },
         )
     )
@@ -187,31 +188,18 @@ def setup_builder() -> mjswan.Builder:
                     params={"command_name": "skate"},
                     scale=(2.0, 1.0),
                 ),
-                "heading": ObservationTermCfg(
-                    func=terms.heading,
-                    scale=1.0 / math.pi,
-                ),
+                "heading": ObservationTermCfg(func=terms.heading, scale=1.0 / math.pi),
                 "base_ang_vel": ObservationTermCfg(
                     func=obs_fns.builtin_sensor,
                     params={"sensor_name": f"{ENTITY}/imu_ang_vel"},
                     scale=0.25,
                 ),
-                "projected_gravity": ObservationTermCfg(
-                    func=obs_fns.projected_gravity,
-                ),
-                "joint_pos": ObservationTermCfg(
-                    func=obs_fns.joint_pos_rel,
-                ),
-                "joint_vel": ObservationTermCfg(
-                    func=obs_fns.joint_vel_rel,
-                    scale=0.05,
-                ),
-                "actions": ObservationTermCfg(
-                    func=obs_fns.last_action,
-                ),
+                "projected_gravity": ObservationTermCfg(func=obs_fns.projected_gravity),
+                "joint_pos": ObservationTermCfg(func=obs_fns.joint_pos_rel),
+                "joint_vel": ObservationTermCfg(func=obs_fns.joint_vel_rel, scale=0.05),
+                "actions": ObservationTermCfg(func=obs_fns.last_action),
                 "phase": ObservationTermCfg(
-                    func=obs_fns.generated_commands,
-                    params={"command_name": "phase"},
+                    func=obs_fns.generated_commands, params={"command_name": "phase"}
                 ),
             },
         ),
@@ -231,7 +219,6 @@ def setup_builder() -> mjswan.Builder:
         },
         policy_joint_names=joint_names,
         default_joint_pos=default_joint_pos,
-        default=True,
     )
 
     return builder

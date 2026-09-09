@@ -9,7 +9,7 @@ authors = [{ name = "mjswan Developers" }]
 # pre-built wheel for 3.13+.
 requires-python = ">=3.10, <3.13"
 dependencies = [
-    "mjswan>=0.9.3",
+    "mjswan>=0.9.4",
     "mjlab==1.5.3",
     "torch>=2.9.1",
     "onnx>=1.20.0",
@@ -67,6 +67,8 @@ override-dependencies = [
 
 [dependency-groups]
 dev = ["pytest>=9.0.2", "ruff==0.16.0"]
+# Only `scripts/record_preview.py` needs it, and it pulls a browser down with it.
+previews = ["playwright>=1.55"]
 
 [tool.ruff]
 lint.select = ["E", "F", "I"]

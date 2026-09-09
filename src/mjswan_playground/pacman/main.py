@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any, get_args
+from typing import Any
 
 import mjswan
 import onnx
 from mjlab.tasks.registry import load_env_cfg
 from mjswan.adapters import DEFAULT_OBS_GROUP_KEY, adapt_observations
-from mjswan.managers.event_manager import EventMode, EventTermCfg
+from mjswan.managers.event_manager import EventTermCfg
 from mjswan.managers.observation_manager import ObservationTermCfg
 
 from . import terms, upstream
@@ -69,18 +69,6 @@ _DEPTH_KEYS = (
 )
 
 
-def _require_manual_events() -> None:
-    """Fail the build now: an unknown mode buckets with the reset terms, so on an engine
-    without `mode="manual"` the buttons would throw on every reset instead of failing."""
-    if "manual" not in get_args(EventMode):
-        raise RuntimeError(
-            f'The pacman task\'s throw buttons need mjswan with `mode="manual"` event '
-            f"terms; the installed {mjswan.__version__} has "
-            f"{sorted(get_args(EventMode))}. Upgrade mjswan to the release carrying "
-            "ttktjmt/mjswan#104 (see pyproject.toml)."
-        )
-
-
 def _depth_geometry(params: dict[str, Any]) -> dict[str, Any]:
     """``near`` / ``far`` from upstream's depth term; refuse what we cannot reproduce."""
     extra = {key: value for key, value in params.items() if key not in _DEPTH_KEYS}
@@ -131,7 +119,6 @@ def _strip_untraceable(env_cfg: Any) -> None:
 
 def _add_dodge_scene(project: mjswan.ProjectHandle, root, contract) -> None:
     """The paper's regime: a ball every 1–4 s, or one on demand, seen only as depth."""
-    _require_manual_events()
     env_cfg = load_env_cfg(DODGE_TASK_ID, play=True)
     upstream_throw = env_cfg.events["throw_ball_on_dwell"].params
     throw_params = {
@@ -184,7 +171,6 @@ def _add_dodge_scene(project: mjswan.ProjectHandle, root, contract) -> None:
         commands={COMMAND_NAME: mjswan.ui_command([])},
         policy_joint_names=[f"robot/{name}" for name in contract.POLICY_JOINT_NAMES],
         default_joint_pos=[float(value) for value in contract.DEFAULT_POS],
-        default=True,
     )
 
 
@@ -204,7 +190,6 @@ def _add_walk_scene(project: mjswan.ProjectHandle, root, contract) -> None:
         policy=onnx.load(str(root / WALK_POLICY_ONNX)),
         policy_joint_names=[f"robot/{name}" for name in contract.POLICY_JOINT_NAMES],
         default_joint_pos=[float(value) for value in contract.DEFAULT_POS],
-        default=True,
     )
 
 

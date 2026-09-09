@@ -8,8 +8,7 @@ A 25 cm, 800 g bipedal duck, and every policy its onboard daemon ships — walki
 commandable head, standing with trunk-pose control, sit ↔ stand, touching the ground with
 its mouth, kicking a ball with either foot, a forward roll, and skating on passive wheels.
 On the robot one daemon hot-swaps them behind a shared 61-value observation contract; here
-each gets its own scene, for the reason under
-[What differs from upstream](#what-differs-from-upstream).
+they hot-swap the same way, on the four scenes the XMLs actually differ in.
 
 ## Run
 
@@ -32,15 +31,19 @@ The build clones both repositories into `.cache/` at pinned commits.
 
 | Scene | Policy | Twist slot (3) | Head (4) | Body (6) | Resets on a 70° tilt |
 |---|---|---|---|---|---|
-| Walk | `alpha_walking` | forward / sideways / turn sliders | sliders | zero | yes |
-| Stand & Pose | `alpha_stand` | zero | sliders | height / roll / pitch sliders, x·y·yaw zero | no |
-| Sit / Stand | `alpha_sitstand` | a Sit checkbox in slot 0 | sliders | zero | no |
-| Ground Pick | `alpha_ground_pick` | a 4 s phase clock | zero | zero | yes |
-| Roulade | `roulade` | zero | zero | zero | no |
-| Ball Kick (right) | `ball_kick_right` | zero | zero | zero | yes |
-| Ball Kick (left) | `ball_kick_left` | zero | zero | zero | yes |
-| Roller Skate | `roller` | throttle + heading-error sliders | zero | zero | yes |
-| Roller Crouch | `roller_crouch` | a 4 s phase clock | zero | zero | yes |
+| Duck | Walk — `alpha_walking` | forward / sideways / turn sliders | sliders | zero | yes |
+| Duck | Stand & Pose — `alpha_stand` | zero | sliders | height / roll / pitch sliders, x·y·yaw zero | no |
+| Duck | Sit / Stand — `alpha_sitstand` | a Sit checkbox in slot 0 | sliders | zero | no |
+| Duck | Ground Pick — `alpha_ground_pick` | a 4 s phase clock | zero | zero | yes |
+| Duck | Roulade — `roulade` | zero | zero | zero | no |
+| Ball (right foot) | Kick — `ball_kick_right` | zero | zero | zero | yes |
+| Ball (left foot) | Kick — `ball_kick_left` | zero | zero | zero | yes |
+| Rollers | Skate — `roller` | throttle + heading-error sliders | zero | zero | yes |
+| Rollers | Crouch — `roller_crouch` | a 4 s phase clock | zero | zero | yes |
+
+Four scenes, not nine: mjswan traces each policy's terms into its own `mdp/<policy>/`, so
+policies only split where the scene does — the ball, baked in at one of two placements,
+and the wheels.
 
 "Zero" is not a shortcut: every policy reads the same 13-wide command block, and an env
 that does not drive a slot pads it rather than dropping it (`zero_command_padding`). That
@@ -86,10 +89,6 @@ not pacman's. It also means the pinned `mjlab` version never has to agree with u
 
 ## What differs from upstream
 
-- **One policy per scene.** mjswan writes a scene's fused observation graph to one
-  `obs/<group>.onnx`, so policies reading different command slots would overwrite each
-  other's. The nine need five layouts, hence nine scenes off four specs: upstream's three
-  XMLs, the kick one mirrored per foot.
 - **The actuator is the XML's, not BAM's** — above. The joint `damping` (0.053),
   `frictionloss` (0.0048) and `armature` (0.0018) stay as exported; under BAM the first
   two are zeroed and recomputed in torch.

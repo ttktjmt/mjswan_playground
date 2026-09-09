@@ -80,11 +80,3 @@ register_command(
     "PhaseCommandCfg",
     CommandBinding(state_fields=["phase", "step_count"], command_field="phase"),
 )
-
-
-class CommandValues:
-    """Width-only stand-in for a command term: ``generated_commands`` traces against an
-    env with no command manager, and the runtime serves the live command browser-side."""
-
-    def __init__(self, width: int) -> None:
-        self.command = torch.zeros(1, width)
