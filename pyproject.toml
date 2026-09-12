@@ -20,6 +20,15 @@ dependencies = [
 [project.optional-dependencies]
 # Registers the `Wbc-*` tasks with mjlab; only the wbc task needs it.
 wbc = ["wbc-mjlab>=0.0.5"]
+# Registers the `myoMimic*` tasks with mjlab and reads the public Orbax checkpoint; only
+# the musclemimic task needs it.
+# TODO: myosuite is pinned to a *private* repository (see [tool.uv.sources] below), so
+# this extra only resolves for an account with access.
+musclemimic = [
+    "myosuite[musclemimic]",
+    "orbax-checkpoint>=0.11",
+    "onnxconverter-common>=1.16",
+]
 
 [project.scripts]
 mjswan-playground = "mjswan_playground._cli:app"
@@ -35,6 +44,16 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mjswan_playground"]
+
+# musclemimic needs raw-`mjData` slots and the `direct` muscle mode, which are in
+# ttktjmt/mjswan#109; drop this and require the release that carries them once it lands.
+[tool.uv.sources]
+mjswan = { git = "https://github.com/ttktjmt/mjswan", branch = "sim-data-slots" }
+# TODO: this repository is private, and it is the only source of the `myoMimic*` mjlab
+# tasks and of `FullbodyObsAdapter`, the observation the public checkpoint reads; neither
+# is in the public `myosuite` release (PyPI 2.12.2) or in MyoHub/myosuite. Replace this
+# with the published package once that backend lands there, and drop the pin.
+myosuite = { git = "https://github.com/Vittorio-Caggiano/myosuite4", rev = "cd8e7fcc2a33bb64bfb748a8927891acf90fbbe7" }
 
 # Same overrides mjswan itself carries: mjlab pulls a mujoco older than the one
 # mujoco-warp needs, and myosuite pins an h5py with no arm64 wheel.
