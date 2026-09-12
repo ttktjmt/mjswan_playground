@@ -47,7 +47,7 @@ ROOT_JOINT = "trunk_base_freejoint"
 TRACKED_BODY = "trunk_base"
 BALL_JOINT = "ball_free"
 
-#: ``sim.mujoco.timestep`` (0.005) * ``decimation`` (4) — 50 Hz. The XMLs carry no
+#: ``sim.mujoco.timestep`` (0.005) * ``decimation`` (4): 50 Hz. The XMLs carry no
 #: ``<option>``, so both halves travel in the spec.
 CONTROL_DT = 0.02
 TIMESTEP = 0.005
@@ -72,11 +72,15 @@ BALL_OFFSET_X = 0.08
 BALL_OFFSET_ABS_Y = 0.042
 BALL_RADIUS = 0.035
 
+#: Upstream licenses the STL meshes (21 of the 26 MB each scene compiles in) under
+#: Creative Commons BY-SA-NC, not the Apache-2.0 its code and the policies carry.
+MODELS_LICENSE = Path(__file__).parent / "LICENSE.3d-models"
+
 #: ``make_velocity_env_cfg``'s fall termination, which upstream drops on the policies
 #: that start or end on the ground.
 FELL_OVER_ANGLE_DEG = 70.0
 
-#: The final command ranges the curricula reach — what a finished policy has seen — as
+#: The final command ranges the curricula reach (what a finished policy has seen) as
 #: the sliders that drive them: ``(name, label, range)``.
 TWIST_SLIDERS = (
     ("lin_vel_x", "Forward (m/s)", (-0.4, 0.4)),
@@ -104,7 +108,7 @@ BODY_SLIDERS = (
 #: Trace-time widths for the commands the browser owns. One table for every scene: the
 #: tracer only resolves the names a policy's own terms read, so a spare entry costs
 #: nothing. The phase clock is traced for real, but the term reading it still resolves
-#: its name against the trace env — as husky's does.
+#: its name against the trace env, as husky's does.
 TRACE_COMMAND_WIDTHS = {
     "twist": 3,
     "throttle": 1,
@@ -134,7 +138,7 @@ class _Scene:
     """One upstream XML, and the policies that run in it.
 
     Nine policies over four scenes: mjswan traces each policy's terms into its own
-    ``mdp/<policy>/``, so they only need splitting where the *scene* differs — wheels,
+    ``mdp/<policy>/``, so they only need splitting where the *scene* differs: wheels,
     or a ball baked in at one of two placements.
     """
 
@@ -215,8 +219,8 @@ def _resolve_deploy_root() -> Path:
 
 
 def _servo_joints(model: mujoco.MjModel) -> list[str]:
-    """The 14 servos in actuator order, the order every policy reads and writes — the
-    same way upstream's runtime indexes (``jnt_qposadr[actuator_trnid]``), which drops the
+    """The 14 servos in actuator order, the order every policy reads and writes. It is
+    how upstream's runtime indexes them (``jnt_qposadr[actuator_trnid]``), which drops the
     rollers model's four passive wheel hinges on its own."""
     names: list[str] = []
     for actuator in range(model.nu):
@@ -399,7 +403,7 @@ def _pose(
     obs = {"head_command": _driven("head_pose") if policy.head else _padded(4)}
     if policy.body:
         commands["body_pose"] = _sliders(BODY_SLIDERS)
-        # [x, y, z, roll, pitch, yaw] — see `BODY_SLIDERS`.
+        # [x, y, z, roll, pitch, yaw]; see `BODY_SLIDERS`.
         obs["body_xy"] = _padded(2)
         obs["body_command"] = _driven("body_pose")
         obs["body_yaw"] = _padded(1)
@@ -451,6 +455,7 @@ def setup_builder() -> mjswan.Builder:
         )
 
         scene = project.add_scene(name=entry.name, spec=spec, control_dt=CONTROL_DT)
+        scene.add_attribution("3d-models", license=MODELS_LICENSE)
         scene.set_viewer(
             mjswan.ViewerConfig(
                 # Three-quarter view from the front: 25 cm of robot, and its face is

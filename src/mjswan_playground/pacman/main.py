@@ -30,9 +30,9 @@ BALL_GEOM = "ball_collision"
 #: Walking, not standing. Inside the play config's own `lin_vel_x` range.
 DEFAULT_FORWARD_SPEED = 0.5
 
-#: Reference-state initialization from the AMP clips — see README.
+#: Reference-state initialization from the AMP clips; see README.
 MOTION_EVENTS = ("init_motion_loader", "reset_from_motion")
-#: Dodge events with nothing to trace, or nothing to trace them from — see README.
+#: Dodge events with nothing to trace, or nothing to trace them from; see README.
 DROPPED_DODGE_EVENTS = MOTION_EVENTS + ("throw_ball_on_dwell", "randomize_ball_size")
 #: A dwell counter mjswan has no state for; `bad_base_height` still catches the fall.
 DROPPED_DODGE_TERMINATIONS = ("collapsed_crouch",)
@@ -76,7 +76,7 @@ def _depth_geometry(params: dict[str, Any]) -> dict[str, Any]:
         raise ValueError(
             f"Upstream's depth term carries domain randomization this task cannot "
             f"reproduce ({sorted(k for k, v in extra.items() if v)}). The browser image "
-            "is the clean one its play config builds — unset BALLONLY_AUG / "
+            "is the clean one its play config builds; unset BALLONLY_AUG / "
             "BALLONLY_DR_SCALE, or extend `terms.ball_depth`."
         )
     if int(params.get("update_period", 1)) != 1:
@@ -89,7 +89,7 @@ def _depth_geometry(params: dict[str, Any]) -> dict[str, Any]:
 
 
 def _model_geometry(env_cfg: Any) -> dict[str, float]:
-    """Camera fovy and ball radius off the specs — a traced term sees only state."""
+    """Camera fovy and ball radius off the specs: a traced term sees only state."""
     robot_spec = env_cfg.scene.entities["robot"].spec_fn()
     ball_spec = env_cfg.scene.entities["ball"].spec_fn()
     return {
@@ -178,7 +178,7 @@ def _add_walk_scene(project: mjswan.ProjectHandle, root, contract) -> None:
     """The locomotion half of the same stack, on flat ground.
 
     No `commands=`: the scene's `env_cfg` carries upstream's own `twist`, which mjswan
-    adapts — resampled as mjlab resamples it, with mjlab's joystick panel over the top.
+    adapts: resampled as mjlab resamples it, with mjlab's joystick panel over the top.
     """
     env_cfg = load_env_cfg(WALK_TASK_ID, play=True)
     for name in MOTION_EVENTS:

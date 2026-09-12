@@ -1,0 +1,17 @@
+SPDX-License-Identifier: CC-BY-NC-SA-4.0
+
+The Microduck 3D model files (the STL meshes these scenes compile in) are licensed
+under Creative Commons BY-SA-NC by Pollen Robotics, stated in the source repository's
+README (https://github.com/pollen-robotics/microduck_rl#license):
+
+    "This project is licensed under the Apache 2.0 License. [...]
+     3D model files are licensed under Creative Commons BY-SA-NC."
+
+Upstream names no version and ships no license text. The identifier above is the same
+license under SPDX's spelling at the current CC version, whose terms are at
+
+    https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+
+NonCommercial and ShareAlike both bear on redistributing a scene that contains these
+meshes. The copies on mjswan Cloud are up there under permission granted directly by
+the author; that permission does not travel with the files.

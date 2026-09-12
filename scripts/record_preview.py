@@ -6,7 +6,7 @@
 
 Builds the task if `dist/<task-id>` is missing, serves it with the COOP/COEP headers
 MuJoCo WASM needs, drives the app's own control panel to set the shot up, then films the
-canvas into `assets/<task-id>.gif` at 480x351 / 15 fps — the size, aspect ratio and frame
+canvas into `assets/<task-id>.gif` at 480x351 / 15 fps: the size, aspect ratio and frame
 rate mjlab_playground's previews use.
 
 Two things here are not obvious:
@@ -66,14 +66,14 @@ class Preview:
             ``("number", <slider label>, <value>)``, ``("checkbox", <label>, <bool>)``,
             ``("click", <button label>)`` or ``("wait", <seconds>)``.
         motions: Motions to film one after another, concatenated into one GIF with
-            `seconds` split evenly between them — for a tracking policy, where the point
+            `seconds` split evenly between them: for a tracking policy, where the point
             is the range of motions rather than any single one. Empty films one segment
             of whatever `steps` left running.
         query: Extra URL query, e.g. ``"ref=0"`` to drop the motion-tracking ghost.
         orbit: Degrees to swing the camera, as a drag on empty background would. Positive
             adds to the scene's authored `azimuth` (the camera travels anticlockwise seen
             from above). Body tracking keeps whatever angle the drag leaves.
-        crop: ffmpeg crop of the 960x702 capture, ``w:h:x:y``, at the 480:351 aspect —
+        crop: ffmpeg crop of the 960x702 capture, ``w:h:x:y``, at the 480:351 aspect;
             centres the robot and drops the empty sky above it.
         seconds: Clip length. 4 s is 60 frames at 15 fps.
         settle: Seconds between finishing the setup and rolling, so camera damping and any

@@ -45,7 +45,7 @@ class PhaseCommand(CommandTerm):
     """``_get_phase()`` as a command term: a step counter, divided by the cycle length.
 
     Counting steps rather than accumulating the phase costs a second state field, but
-    ``control_dt / cycle_time`` has no exact float — a running sum drifts, and lands a
+    ``control_dt / cycle_time`` has no exact float: a running sum drifts, and lands a
     full cycle out at the frame where it wraps. Whole steps are exact.
     """
 
@@ -62,7 +62,7 @@ class PhaseCommand(CommandTerm):
 
     def _resample_command(self, env_ids: torch.Tensor) -> None:
         # Only ever fires on reset. `_update_command` runs after, so an episode's first
-        # frame sees one step — as upstream's does.
+        # frame sees one step, as upstream's does.
         del env_ids
         self.phase = torch.zeros_like(self.phase)
         self.step_count = torch.zeros_like(self.step_count)
