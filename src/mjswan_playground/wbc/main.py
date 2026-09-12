@@ -53,7 +53,7 @@ def setup_builder() -> mjswan.Builder:
     contract = yaml.safe_load((deploy / POLICY_CONFIG).read_text())
 
     env_cfg = load_env_cfg(TASK_ID, play=True)
-    # Training-only events the deploy runtime does not apply either — see README.
+    # Training-only events the deploy runtime does not apply either; see README.
     for training_only in ("assistive_wrench", "pull_robot"):
         env_cfg.events.pop(training_only, None)
 

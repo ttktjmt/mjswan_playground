@@ -1,10 +1,10 @@
 """The two terms the dodge task cannot take from upstream as they are. See ``README.md``.
 
-* :func:`ball_depth` — the browser has no render, so the image is ray-sphere
+* :func:`ball_depth`: the browser has no render, so the image is ray-sphere
   intersections instead (as upstream's own ``web-demo`` branch does).
-* :func:`throw_ball` — upstream's launch geometry, on an interval event: mjswan has no
+* :func:`throw_ball`: upstream's launch geometry, on an interval event: mjswan has no
   ``mode="step"`` for its per-env countdown.
-* :func:`add_camera_pose_sensors` — frame sensors giving the term the camera pose.
+* :func:`add_camera_pose_sensors`: frame sensors giving the term the camera pose.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import torch
 from mjlab.envs.mdp import observations as obs_fns
 
 # `sample_uniform` must be a module global: mjswan's RNG spy patches these to record
-# draws, and an unseen draw is baked in as a constant — the same throw, every time.
+# draws, and an unseen draw is baked in as a constant: the same throw, every time.
 from mjlab.utils.lab_api.math import (
     quat_apply,
     quat_apply_inverse,
@@ -37,7 +37,7 @@ def add_camera_pose_sensors(
     """Add ``framepos`` / ``framequat`` sensors on ``camera_name``, in place.
 
     The depth term's only route to the camera pose: ``cam_xpos`` is not an mjswan slot,
-    a sensor window is — and the model keeps the mount offset and +20° tilt.
+    a sensor window is, and the model keeps the mount offset and +20° tilt.
     """
     inner_spec_fn = entity_cfg.spec_fn
 
@@ -72,7 +72,7 @@ def _pixel_rays(
 
     The caller min-pools ``subsample`` rays per pixel axis, as the deployed stack does
     (full-res ZED depth, masked, min-pooled to 9×16). One ray per pixel centre misses
-    a 0.076 m ball until ~1.65 m — most of the reaction window gone.
+    a 0.076 m ball until ~1.65 m, most of the reaction window gone.
     """
     tan_v = math.tan(math.radians(fovy_deg) / 2.0)
     tan_h = tan_v * width / height
@@ -109,11 +109,11 @@ def ball_depth(
 
     Ball pixels carry their depth, every other pixel reads ``far``. The value is the
     **perpendicular** depth (hit projected on the optical axis), which is what the
-    ``mujoco_warp`` sensor and a stereo depth map report — median disagreement 0.017 m
+    ``mujoco_warp`` sensor and a stereo depth map report: median disagreement 0.017 m
     against 0.121 m for the ray distance. Normalization is upstream's
     ``depth_metres_to_obs``: below ``near`` reads as ``far``, then clamp and scale.
 
-    Self-occlusion is not modelled, so the view is only ever cleaner than training's —
+    Self-occlusion is not modelled, so the view is only ever cleaner than training's, still
     inside the distribution, given its per-pixel and whole-ball dropout.
 
     ``fovy`` and ``ball_radius`` are baked in at build time: a traced term sees state,

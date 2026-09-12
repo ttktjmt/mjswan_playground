@@ -12,7 +12,7 @@ A collection of tasks built with [mjswan](https://github.com/ttktjmt/mjswan).
 | [`microduck`](src/mjswan_playground/microduck/README.md) | Microduck | Every policy the robot ships: walk, stand, sit, ground pick, ball kick, roulade, roller skate ([Microduck](https://github.com/pollen-robotics/microduck)) | <a href="https://mjswan.com/s/DOGILsh"><img src="assets/microduck.gif" width="200"/></a><br />[mjswan.com/s/DOGILsh](https://mjswan.com/s/DOGILsh) |
 | [`musclemimic`](src/mjswan_playground/musclemimic/README.md) | MyoFullBody | A 354-muscle body tracking a walking clip with the public 2.05e9-step checkpoint ([MuscleMimic](https://github.com/amathislab/musclemimic), 2026) | — |
 
-The previews are filmed from the built apps by [`scripts/record_preview.py`](scripts/record_preview.py) — one recipe per task, `--all` to re-record them.
+The previews are filmed from the built apps by [`scripts/record_preview.py`](scripts/record_preview.py): one recipe per task, `--all` to re-record them.
 
 ## CLI
 
@@ -22,7 +22,7 @@ uv run msp <subcommand>
 
 | Subcommand | Description | Options |
 |------------|-------------|---------|
-| `list` | List the task IDs | — |
+| `list` | List the task IDs | none |
 | `run <task-id>` | Build a task and open it in the browser | `--host` (`localhost`), `--port` (`8080`), `--no-open`, `--output-dir` |
 | `build <task-id>` | Build a task without launching | `--output-dir` |
 

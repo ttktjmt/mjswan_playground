@@ -28,7 +28,7 @@ ROBOT_XML = "src/mjlab_husky/asset_zoo/robots/skateboard/xmls/g1.xml"
 POLICY_ONNX = "ckpts/test.onnx"
 
 ENTITY = "robot"
-#: `sim.mujoco.timestep` (0.005) * `decimation` (4) — 50 Hz, the rate the policy trained at.
+#: `sim.mujoco.timestep` (0.005) * `decimation` (4): 50 Hz, the rate the policy trained at.
 CONTROL_DT = 0.02
 #: `G1SkaterManagerBasedRlEnvCfg.cycle_time`: seconds per push -> steer cycle.
 CYCLE_TIME = 6.0
@@ -50,7 +50,7 @@ def _scene_spec(scene_xml: Path) -> mujoco.MjSpec:
     """``unitree_g1_skater_env_cfg``'s solver settings, written into the spec.
 
     mjlab applies its ``MujocoCfg`` to a compiled model at startup; the browser compiles
-    from the bundled XML, so they have to travel in the spec. The integrator included —
+    from the bundled XML, so they have to travel in the spec. The integrator included:
     MuJoCo's XML default is Euler, not what the policy trained on.
     """
     spec = mujoco.MjSpec.from_file(str(scene_xml))
@@ -63,8 +63,8 @@ def _scene_spec(scene_xml: Path) -> mujoco.MjSpec:
 
 
 def _robot_joints(model: mujoco.MjModel) -> tuple[list[str], list[float]]:
-    """The policy's joints in model order — *not* actuator order, which is why upstream's
-    ``sim.py`` reindexes — posed at the scene's ``init_state`` keyframe."""
+    """The policy's joints in model order (*not* actuator order, which is why upstream's
+    ``sim.py`` reindexes), posed at the scene's ``init_state`` keyframe."""
     key_qpos = model.key_qpos[0]
     names: list[str] = []
     defaults: list[float] = []
@@ -130,7 +130,12 @@ def setup_builder() -> mjswan.Builder:
         spec=spec,
         control_dt=CONTROL_DT,
     )
-    # No mjlab task to trace against — the task lives in the HUSKY package. The robot
+    scene.add_attribution(
+        "unitree_g1",
+        license="BSD-3-Clause",
+        copyright='HangZhou YuShu TECHNOLOGY CO.,LTD. ("Unitree Robotics")',
+    )
+    # No mjlab task to trace against: the task lives in the HUSKY package. The robot
     # alone covers every term below, plus a width per command.
     scene.set_trace_env(
         build_single_entity_trace_env(

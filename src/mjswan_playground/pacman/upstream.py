@@ -35,7 +35,7 @@ def register_tasks(root: Path) -> None:
     """Import upstream's task package so mjlab's registry knows its task ids.
 
     Upstream runs from source as top-level ``src``, so its root must come *first* on
-    ``sys.path`` — this repo has a ``src/`` of its own that would shadow it.
+    ``sys.path``: this repo has a ``src/`` of its own that would shadow it.
     """
     imported = sys.modules.get("src")
     if imported is not None:
