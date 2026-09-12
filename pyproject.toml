@@ -50,7 +50,7 @@ packages = ["src/mjswan_playground"]
 [tool.uv.sources]
 mjswan = { git = "https://github.com/ttktjmt/mjswan", branch = "sim-data-slots" }
 # TODO: this repository is private, and it is the only source of the `myoMimic*` mjlab
-# tasks and of `FullbodyObsAdapter`, the observation the public checkpoint reads — neither
+# tasks and of `FullbodyObsAdapter`, the observation the public checkpoint reads; neither
 # is in the public `myosuite` release (PyPI 2.12.2) or in MyoHub/myosuite. Replace this
 # with the published package once that backend lands there, and drop the pin.
 myosuite = { git = "https://github.com/Vittorio-Caggiano/myosuite4", rev = "cd8e7fcc2a33bb64bfb748a8927891acf90fbbe7" }

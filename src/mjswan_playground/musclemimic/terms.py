@@ -56,7 +56,7 @@ def _quat_rotate(q: torch.Tensor, v: torch.Tensor) -> torch.Tensor:
 def make_reset(clip_path: Path) -> Callable[[Any, Any], None]:
     """A reset event that puts the body on clip frame 0.
 
-    Same writes as myosuite's ``_mimic_rsi_event`` — root state, then joint state — with
+    Same writes as myosuite's ``_mimic_rsi_event`` (root state, then joint state) with
     one correction: MuJoCo keeps a free joint's angular velocity in the body frame, while
     mjlab's ``write_root_state_to_sim`` takes it in the world frame. myosuite passes the
     clip's ``qvel[3:6]`` through unrotated, and this clip starts at ~1.1 rad/s with the

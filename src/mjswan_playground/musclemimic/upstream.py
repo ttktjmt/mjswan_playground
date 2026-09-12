@@ -2,7 +2,7 @@
 
 ``amathislab/mm-10m-2`` (2.05e9 steps) read upstream ``MjxMyoFullBody``'s 2418-wide
 observation, not the 1152 values myosuite's mjlab task feeds. myosuite ships that layout as
-:class:`FullbodyObsAdapter`, in numpy over ``mujoco.MjData`` — and mjswan can only trace
+:class:`FullbodyObsAdapter`, in numpy over ``mujoco.MjData``, and mjswan can only trace
 torch. :func:`build_terms` reproduces it in torch from raw sim fields the browser serves,
 taking every index and the whole clip-derived half from the numpy adapter so the two
 cannot drift.
@@ -279,7 +279,7 @@ def build_terms(
         adapter = FullbodyObsAdapter(model, clip, params)
 
     n_frames = int(adapter._traj_len)
-    # The clip-derived half — lookahead (276) ++ phase (1) — reads no live state, so the
+    # The clip-derived half, lookahead (276) ++ phase (1), reads no live state, so the
     # numpy adapter computes it per frame and a lookup reproduces it exactly.
     goal_table = torch.as_tensor(
         np.asarray(
