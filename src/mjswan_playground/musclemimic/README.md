@@ -1,6 +1,6 @@
 # MuscleMimic full body (`musclemimic`)
 
-Source: https://github.com/Vittorio-Caggiano/myosuite4 (Apache-2.0) ·
+Source: https://github.com/MyoHub/myosuite/tree/ms3 (Apache-2.0) ·
 policy and clips from https://github.com/amathislab/musclemimic
 
 > Chengkun Li, Cheryl Wang, Bianca Ziliotto, Merkourios Simos, Jozsef Kovecses,
@@ -16,10 +16,9 @@ from myosuite's numpy builder.
 
 ## Run
 
-> **Requires access to a private repository.** The `myoMimic*` mjlab tasks and
-> `FullbodyObsAdapter` live only in [myosuite4](https://github.com/Vittorio-Caggiano/myosuite4),
-> which is private; the public `myosuite` release carries neither. `--extra musclemimic`
-> therefore resolves only for an account with access. The policy and the clips are public.
+The `myoMimic*` mjlab tasks and `FullbodyObsAdapter` live on myosuite's
+[`ms3`](https://github.com/MyoHub/myosuite/tree/ms3) branch, which `--extra musclemimic`
+pins; the PyPI release (2.12.2) carries neither.
 
 ```sh
 uv sync --extra musclemimic
@@ -48,12 +47,16 @@ Actions are written to `ctrl` as they come, clipped to the actuator's `[-1, 1]`
 (`action_mode="direct"`). The 17 mimic sites and the four touch sensors exist in the
 model under mjlab's `entity/` prefixes.
 
+Each raw field reaches the graph indexed, so mjswan narrows the slot to the rows the
+term actually reads: the browser ships 17 of the model's 2038 sites and 4 of its 322
+sensor values per step, not the whole arrays.
+
 | Compared | max \|Δ\| |
 |---|---:|
 | exported actor vs myosuite's numpy forward pass | 6.7e-06 |
 | float16 vs float32 weights (600-step rollout identical) | 1.8e-02 |
 | torch observation vs myosuite's numpy builder, 40 steps | 4.4e-07 |
-| traced graph vs the torch observation, 24 steps | 2.4e-07 |
+| traced graph vs the torch observation, 24 steps | 4.5e-07 |
 
 ## What differs from upstream
 

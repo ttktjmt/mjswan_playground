@@ -1,11 +1,8 @@
 """Playback adjustments to myosuite's mimic terms. None of their math is rewritten.
 
-1. The clip cache is keyed by entity instead of ``id(env)``: the tracer wraps the env in a
-   fresh proxy per pass, and each proxy would otherwise build its own clip source with
-   its own random phase.
-2. The clip frame depends on sim time alone. Training draws a random start frame per
+1. The clip frame depends on sim time alone. Training draws a random start frame per
    episode; the browser resets ``mjData.time`` to 0, so the two would disagree.
-3. The reset event goes to clip frame 0 instead of a random frame, matching (2).
+2. The reset event goes to clip frame 0 instead of a random frame, matching (1).
 """
 
 from __future__ import annotations
@@ -15,32 +12,11 @@ from typing import Any, Callable
 
 import numpy as np
 import torch
-from myosuite.envs.myo.backends.mjlab import mimic_mjlab_env as _mimic
 from myosuite.envs.myo.backends.mjlab.clip_trajectory_source import (
     ClipTrajectorySource,
 )
 
 ENTITY = "mimic_fullbody_robot"
-
-
-class _SharedCache(dict):
-    """myosuite keys its cache on ``(id(env), entity, variant)``; drop the env."""
-
-    @staticmethod
-    def _key(key: tuple) -> tuple:
-        return key[1:]
-
-    def __contains__(self, key: object) -> bool:
-        return super().__contains__(self._key(key))  # type: ignore[arg-type]
-
-    def __getitem__(self, key: tuple):
-        return super().__getitem__(self._key(key))
-
-    def __setitem__(self, key: tuple, value) -> None:
-        super().__setitem__(self._key(key), value)
-
-
-_mimic._mimic_mjlab_cache = _SharedCache()
 
 ClipTrajectorySource._frame_indices = (  # type: ignore[method-assign]
     lambda self, t: (t / self.ctrl_dt).long() % self.n_frames

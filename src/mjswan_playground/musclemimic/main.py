@@ -8,7 +8,6 @@ import onnx
 from mjlab.managers.event_manager import EventTermCfg
 from mjlab.scene import Scene
 from mjlab.tasks.registry import load_env_cfg
-from mjswan.envs.mdp.actions import MuscleActivationActionCfg
 from mjswan.managers.observation_manager import ObservationGroupCfg, ObservationTermCfg
 from mjswan.managers.termination_manager import TerminationTermCfg
 
@@ -30,6 +29,9 @@ def setup_builder() -> mjswan.Builder:
 
     env_cfg = load_env_cfg(TASK_ID, play=True)
     env_cfg.events["rsi"] = EventTermCfg(func=terms.make_reset(clip_path), mode="reset")
+    # Upstream writes the policy output straight to `ctrl`; ~190 of the 354 outputs are
+    # negative every step, and the default sigmoid mode would squash them.
+    env_cfg.actions["muscles"].action_mode = "direct"
 
     model = Scene(env_cfg.scene, device="cpu").spec.compile()
     clip = load_motion_clip(clip_path, expected_nq=model.nq, expected_nv=model.nv)
@@ -40,24 +42,12 @@ def setup_builder() -> mjswan.Builder:
     project = builder.add_project(name="MuscleMimic")
     scene = project.add_scene_mjlab(TASK_ID, env_cfg=env_cfg)
 
-    muscles = env_cfg.actions["muscles"]
     scene.add_policy(
         "mm-10m-2",
         onnx.load(onnx_path),
         observations=ObservationGroupCfg(
             terms={"upstream": ObservationTermCfg(func=contract.observation)}
         ),
-        actions={
-            "muscles": MuscleActivationActionCfg(
-                entity_name=muscles.entity_name,
-                actuator_names=tuple(
-                    f"{muscles.entity_name}/{n}" for n in muscles.actuator_names
-                ),
-                # Upstream writes the output straight to `ctrl`, clipped to the actuator
-                # range ([-1, 1] here); ~190 of the 354 outputs are negative every step.
-                action_mode="direct",
-            )
-        },
         terminations={
             "time_out": env_cfg.terminations["time_out"],
             "deviation": TerminationTermCfg(func=contract.termination),

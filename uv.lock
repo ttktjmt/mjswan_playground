@@ -1569,8 +1569,8 @@ wheels = [
 
 [[package]]
 name = "mjswan"
-version = "0.9.3"
-source = { git = "https://github.com/ttktjmt/mjswan?branch=sim-data-slots#0e742aec40fd76a0153d39345a5b395215f263e9" }
+version = "0.10.2"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mujoco" },
     { name = "nodeenv" },
@@ -1578,6 +1578,10 @@ dependencies = [
     { name = "rich" },
     { name = "typer" },
     { name = "wandb" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/90/de/e82607762e850c7a3bd0f994922d263e630a5245b9442cf8654748ef9e3d/mjswan-0.10.2.tar.gz", hash = "sha256:386d13b4bdd0af4ce74941028af0a8163bd3112e048b94a4681a426bc39048cd", size = 13853411, upload-time = "2026-09-15T04:44:02.82Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/2d/8c/63597e0d103a0986d6a6cd3c1fc038e0e70b552935682ff6368e1a4b6205/mjswan-0.10.2-py3-none-any.whl", hash = "sha256:0d13bbdea627e41398ff165dd287cceb05d83dcf631ced447b992084a7e1d34c", size = 14081676, upload-time = "2026-09-15T04:44:00.323Z" },
 ]
 
 [[package]]
@@ -1616,8 +1620,8 @@ previews = [
 [package.metadata]
 requires-dist = [
     { name = "mjlab", specifier = "==1.5.3" },
-    { name = "mjswan", git = "https://github.com/ttktjmt/mjswan?branch=sim-data-slots" },
-    { name = "myosuite", extras = ["musclemimic"], marker = "extra == 'musclemimic'", git = "https://github.com/Vittorio-Caggiano/myosuite4?rev=cd8e7fcc2a33bb64bfb748a8927891acf90fbbe7" },
+    { name = "mjswan", specifier = ">=0.10.2" },
+    { name = "myosuite", extras = ["musclemimic"], marker = "extra == 'musclemimic'", git = "https://github.com/MyoHub/myosuite?branch=ms3" },
     { name = "onnx", specifier = ">=1.20.0" },
     { name = "onnxconverter-common", marker = "extra == 'musclemimic'", specifier = ">=1.16" },
     { name = "orbax-checkpoint", marker = "extra == 'musclemimic'", specifier = ">=0.11" },
@@ -1841,29 +1845,25 @@ wheels = [
 
 [[package]]
 name = "myo-sim"
-version = "0.2.0"
-source = { git = "https://github.com/MyoHub/myo_sim.git?rev=mm_refactor_mjspec#e6272f0a5f8f632d1e325d1d08fd87bf0ca557c8" }
+version = "0.2.3"
+source = { git = "https://github.com/MyoHub/myo_sim.git?rev=dev#9405437e55f39db2ca5f73c0d7e9a63d5a9928dc" }
 dependencies = [
-    { name = "matplotlib", version = "3.10.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "matplotlib", version = "3.11.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "mujoco" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "scipy", version = "1.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.11.*'" },
-    { name = "scipy", version = "1.18.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
 
 [[package]]
 name = "myosuite"
-version = "2.11.6"
-source = { git = "https://github.com/Vittorio-Caggiano/myosuite4?rev=cd8e7fcc2a33bb64bfb748a8927891acf90fbbe7#cd8e7fcc2a33bb64bfb748a8927891acf90fbbe7" }
+version = "2.12.2"
+source = { git = "https://github.com/MyoHub/myosuite?branch=ms3#bc9e5cef42e07db57c3d45ebbfa421b7627aaf0e" }
 dependencies = [
     { name = "click" },
     { name = "flatten-dict" },
     { name = "furniture-sim" },
     { name = "gymnasium" },
     { name = "h5py" },
+    { name = "huggingface-hub" },
     { name = "imageio", extra = ["ffmpeg"] },
     { name = "joblib" },
     { name = "loop-rate-limiters" },

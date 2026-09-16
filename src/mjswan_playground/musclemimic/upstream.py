@@ -31,11 +31,9 @@ import mujoco
 import numpy as np
 import torch
 from huggingface_hub import hf_hub_download, snapshot_download
+from mjlab.utils.lab_api.math import quat_from_matrix
 
 from mjswan_playground._deps import CACHE_DIR
-
-# TODO: everything imported from `myosuite` below comes from a private repository pinned in
-# pyproject.toml; swap the pin for the published package once its mjlab backend ships.
 
 POLICY_REPO_ID = "amathislab/mm-10m-2"
 #: Gated (auto-approved) dataset: ``hf auth login`` once.
@@ -68,34 +66,21 @@ def ensure_policy() -> tuple[Path, dict[str, Any]]:
 def _convert(onnx_path: Path, params_path: Path) -> None:
     import onnx
     import onnxruntime as ort
+    from myosuite.integrations.musclemimic.actor_onnx import export_to_onnx
     from myosuite.integrations.musclemimic.actor_torch import MimicActorModule
     from myosuite.integrations.musclemimic.fullbody_local_policy import (
         _actor_forward,
+        fullbody_obs_adapter_params_from_metadata,
         load_local_policy_artifacts,
+        read_checkpoint_config_metadata,
     )
     from onnxconverter_common import float16
 
     root = Path(snapshot_download(POLICY_REPO_ID))
-    env_params = json.loads((root / "config" / "metadata").read_text())["experiment"][
-        "env_params"
-    ]
     artifacts = load_local_policy_artifacts(root)
-    module = MimicActorModule(artifacts.params, artifacts.obs_mean, artifacts.obs_var)
-    module.eval()
+    module = MimicActorModule.from_artifacts(artifacts)
 
-    _CACHE.mkdir(parents=True, exist_ok=True)
-    fp32 = onnx_path.with_suffix(".fp32.onnx")
-    example = torch.from_numpy(np.asarray(artifacts.obs_mean, dtype=np.float32)[None])
-    torch.onnx.export(
-        module,
-        (example,),
-        str(fp32),
-        input_names=["obs"],
-        output_names=["actions"],
-        dynamic_axes={"obs": {0: "batch"}, "actions": {0: "batch"}},
-        opset_version=17,
-        dynamo=False,
-    )
+    fp32 = export_to_onnx(module, _CACHE / "policy_mm10m2.fp32.onnx")
     # keep_io_types: the browser feeds and reads float32; only the weights shrink.
     onnx.save(
         float16.convert_float_to_float16(onnx.load(fp32), keep_io_types=True), onnx_path
@@ -114,9 +99,7 @@ def _convert(onnx_path: Path, params_path: Path) -> None:
     )
     reference = _actor_forward(
         artifacts.params,
-        ((sample - artifacts.obs_mean) / np.sqrt(artifacts.obs_var + 1e-8))
-        .clip(-10, 10)
-        .astype(np.float32),
+        module.normalize(torch.from_numpy(sample)).detach().numpy(),
     )
     exported = ort.InferenceSession(str(fp32), providers=["CPUExecutionProvider"]).run(
         ["actions"], {"obs": sample}
@@ -129,27 +112,15 @@ def _convert(onnx_path: Path, params_path: Path) -> None:
 
     params_path.write_text(
         json.dumps(
-            {
-                **{k: v for k, v in env_params.items() if k.startswith("enable_")},
-                **env_params["goal_params"],
-            },
+            fullbody_obs_adapter_params_from_metadata(
+                read_checkpoint_config_metadata(root)
+            ),
             indent=1,
         )
     )
 
 
 # --- The observation and termination, in torch ------------------------------------
-
-
-def _tensor(value: Any) -> torch.Tensor:
-    """The tensor behind an mjlab ``TorchArray``, or the tensor itself.
-
-    ``TorchArray.__torch_function__`` only unwraps proxies passed as direct arguments, so
-    ``torch.stack([proxy, ...])`` recurses until the stack overflows. Reading through this
-    also makes the live env and the tracer's recording proxy behave identically.
-    """
-    detach = getattr(value, "detach", None)
-    return detach() if callable(detach) else torch.as_tensor(value)
 
 
 @contextlib.contextmanager
@@ -170,44 +141,17 @@ def _resolve_entity_names(entity: str = ENTITY):
 
 
 def _mat_to_rotvec(mat: torch.Tensor) -> torch.Tensor:
-    """Rotation matrices to rotation vectors, as ``scipy`` does it.
+    """Rotation matrices to rotation vectors, as ``scipy``'s ``as_rotvec`` does it.
 
-    Branchless: all four quaternion candidates and both angle series are computed, then
-    selected with ``gather``/``where``, so the graph has no data-dependent control flow.
+    mjlab's ``quat_from_matrix`` is branchless, so the graph has no data-dependent
+    control flow. Its ``axis_angle_from_quat`` is not usable here: it flips the sign by
+    multiplying with a bool, which traces to an ONNX ``Mul`` on a bool that onnxruntime
+    rejects.
     """
-    m = mat
-    trace = m[..., 0, 0] + m[..., 1, 1] + m[..., 2, 2]
-    decision = torch.stack([m[..., 0, 0], m[..., 1, 1], m[..., 2, 2], trace], dim=-1)
-
-    candidates = []
-    for i in range(3):
-        j, k = (i + 1) % 3, (i + 2) % 3
-        quat = [torch.zeros_like(trace)] * 4
-        quat[i] = 1.0 - trace + 2.0 * m[..., i, i]
-        quat[j] = m[..., j, i] + m[..., i, j]
-        quat[k] = m[..., k, i] + m[..., i, k]
-        quat[3] = m[..., k, j] - m[..., j, k]
-        candidates.append(torch.stack(quat, dim=-1))
-    candidates.append(
-        torch.stack(
-            [
-                m[..., 2, 1] - m[..., 1, 2],
-                m[..., 0, 2] - m[..., 2, 0],
-                m[..., 1, 0] - m[..., 0, 1],
-                1.0 + trace,
-            ],
-            dim=-1,
-        )
-    )
-    stacked = torch.stack(candidates, dim=-2)
-    choice = torch.argmax(decision, dim=-1, keepdim=True)
-    quat = torch.gather(stacked, -2, choice.unsqueeze(-1).expand(*choice.shape, 4))
-    quat = quat.squeeze(-2)
-    quat = quat / torch.linalg.vector_norm(quat, dim=-1, keepdim=True).clamp_min(1e-12)
-
+    quat = quat_from_matrix(mat)
     # w >= 0 puts the angle in [0, pi], as `as_rotvec` requires.
-    quat = torch.where(quat[..., 3:4] < 0.0, -quat, quat)
-    vec, w = quat[..., :3], quat[..., 3]
+    quat = torch.where(quat[..., :1] < 0.0, -quat, quat)
+    w, vec = quat[..., 0], quat[..., 1:]
     angle = 2.0 * torch.atan2(torch.linalg.vector_norm(vec, dim=-1), w)
     squared = angle * angle
     small = 2.0 + squared / 12.0 + 7.0 * squared * squared / 2880.0
@@ -216,20 +160,17 @@ def _mat_to_rotvec(mat: torch.Tensor) -> torch.Tensor:
 
 
 def _relative_site_quantities(
-    site_xpos: torch.Tensor,
-    site_xmat: torch.Tensor,
-    cvel: torch.Tensor,
-    subtree_com: torch.Tensor,
-    site_ids: torch.Tensor,
-    parent_body: torch.Tensor,
-    root_body: torch.Tensor,
+    pos: torch.Tensor,
+    mat: torch.Tensor,
+    body_cvel: torch.Tensor,
+    root_com: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """Mimic-site positions, angles and velocities relative to the first (pelvis) site."""
-    pos = site_xpos.index_select(1, site_ids)
-    mat = site_xmat.index_select(1, site_ids).reshape(*pos.shape[:2], 3, 3)
-    body_cvel = cvel.index_select(1, parent_body)  # angular ++ linear
-    root_com = subtree_com.index_select(1, root_body)
+    """Mimic-site positions, angles and velocities relative to the first (pelvis) site.
 
+    Every argument is already narrowed to the mimic sites, ``(B, n_sites, ...)``.
+    ``body_cvel`` is the parent body's spatial velocity (angular ++ linear) and
+    ``root_com`` its root subtree centre of mass.
+    """
     angular = body_cvel[..., :3]
     linear = body_cvel[..., 3:] - torch.cross(pos - root_com, angular, dim=-1)
 
@@ -292,87 +233,79 @@ def build_terms(
     )
     ref_root = torch.as_tensor(np.asarray(clip.qpos[:n_frames, :3], dtype=np.float32))
 
-    idx = {
-        "qpos_root": adapter._root_qpos_idx_full[2:],
-        "qpos_rest": adapter._qpos_non_root_ind,
-        "qvel_root": adapter._root_qvel_idx_full,
-        "qvel_rest": adapter._qvel_non_root_ind,
-        "site": adapter._site_ids,
+    site = np.asarray(adapter._site_ids)
+    parent_body = np.asarray(adapter._sim_site_bodyid)[site]
+    ix = {
+        k: torch.as_tensor(np.asarray(v, dtype=np.int64))
+        for k, v in {
+            "qpos_root": adapter._root_qpos_idx_full[2:],
+            "qpos_rest": adapter._qpos_non_root_ind,
+            "qvel_root": adapter._root_qvel_idx_full,
+            "qvel_rest": adapter._qvel_non_root_ind,
+            "site": site,
+            "parent_body": parent_body,
+            "root_body": np.asarray(adapter._sim_body_rootid)[parent_body],
+        }.items()
     }
-    parent_body = np.asarray(adapter._sim_site_bodyid)[idx["site"]]
-    idx["parent_body"] = parent_body
-    idx["root_body"] = np.asarray(adapter._sim_body_rootid)[parent_body]
-    ix = {k: torch.as_tensor(np.asarray(v, dtype=np.int64)) for k, v in idx.items()}
     touch = [
         (int(model.sensor_adr[s]), int(model.sensor_dim[s]))
         for s in adapter._touch_sensor_ids
     ]
 
-    def sites(data: Any, batch: int):
+    def sites(data: Any):
+        # Index the raw field: that is what tells the tracer to ship 17 rows, not 2038.
         return _relative_site_quantities(
-            _tensor(data.site_xpos).reshape(batch, -1, 3),
-            _tensor(data.site_xmat).reshape(batch, -1, 9),
-            _tensor(data.cvel).reshape(batch, -1, 6),
-            _tensor(data.subtree_com).reshape(batch, -1, 3),
-            ix["site"],
-            ix["parent_body"],
-            ix["root_body"],
+            data.site_xpos[:, ix["site"]],
+            data.site_xmat[:, ix["site"]],
+            data.cvel[:, ix["parent_body"]],
+            data.subtree_com[:, ix["root_body"]],
         )
 
     def frame_of(data: Any) -> torch.Tensor:
-        return (_tensor(data.time) / ctrl_dt).long().reshape(-1) % n_frames
+        return (data.time / ctrl_dt).long() % n_frames
 
     def observation(env: Any) -> torch.Tensor:
-        data = env.scene[ENTITY].data.data
-        qpos, qvel = _tensor(data.qpos), _tensor(data.qvel)
-        batch = qpos.shape[0]
+        data = env.sim.data
+        qpos, qvel = data.qpos, data.qvel
         parts = [
-            qpos.index_select(1, ix["qpos_root"]),
-            qpos.index_select(1, ix["qpos_rest"]),
-            qvel.index_select(1, ix["qvel_root"]),
-            qvel.index_select(1, ix["qvel_rest"]),
+            qpos[:, ix["qpos_root"]],
+            qpos[:, ix["qpos_rest"]],
+            qvel[:, ix["qvel_root"]],
+            qvel[:, ix["qvel_rest"]],
             # Per actuator, in actuator order: length, velocity, force, ctrl, act.
+            # `[:]` unwraps the `TorchArray` a live env serves; `stack` won't in a list.
             torch.stack(
                 [
-                    _tensor(data.actuator_length),
-                    _tensor(data.actuator_velocity),
-                    _tensor(data.actuator_force),
-                    _tensor(data.ctrl),
-                    _tensor(data.act),
+                    data.actuator_length[:],
+                    data.actuator_velocity[:],
+                    data.actuator_force[:],
+                    data.ctrl[:],
+                    data.act[:],
                 ],
                 dim=-1,
-            ).reshape(batch, -1),
+            ).flatten(1),
         ]
         if touch:
-            sensordata = _tensor(data.sensordata)
+            sensordata = data.sensordata
             parts.append(
                 torch.stack(
                     [sensordata[:, a : a + d].sum(-1) for a, d in touch], dim=-1
                 )
             )
-        site_rpos, site_rangles, site_rvel = sites(data, batch)
-        parts += [
-            site_rpos.reshape(batch, -1),
-            site_rangles.reshape(batch, -1),
-            site_rvel.reshape(batch, -1),
-            goal_table.index_select(0, frame_of(data)),
-        ]
+        parts += [q.flatten(1) for q in sites(data)]
+        parts.append(goal_table[frame_of(data)])
         return torch.cat(parts, dim=-1)
 
     def termination(env: Any) -> torch.Tensor:
-        data = env.scene[ENTITY].data.data
-        qpos = _tensor(data.qpos)
-        batch = qpos.shape[0]
+        data = env.sim.data
         frame = frame_of(data)
-        site_rpos, _, _ = sites(data, batch)
+        site_rpos, _, _ = sites(data)
         # The goal row opens with the reference site_rpos at this frame.
-        reference = goal_table.index_select(0, frame)[:, : site_rpos.shape[1] * 3]
+        reference = goal_table[frame][:, : site_rpos.shape[1] * 3]
         deviation = torch.linalg.vector_norm(
-            site_rpos - reference.reshape(batch, -1, 3), dim=-1
+            site_rpos - reference.unflatten(-1, (-1, 3)), dim=-1
         ).mean(-1)
-        root = torch.linalg.vector_norm(
-            qpos[:, :3] - ref_root.index_select(0, frame), dim=-1
-        )
+        root = torch.linalg.vector_norm(data.qpos[:, :3] - ref_root[frame], dim=-1)
         return (deviation > site_threshold) | (root > root_threshold)
 
     return Terms(observation=observation, termination=termination, adapter=adapter)
