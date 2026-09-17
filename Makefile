@@ -1,6 +1,6 @@
 .PHONY: sync
 sync:
-	uv sync --extra wbc
+	uv sync --extra wbc --extra musclemimic
 
 .PHONY: format
 format:

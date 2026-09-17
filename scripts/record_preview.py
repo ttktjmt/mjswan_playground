@@ -70,6 +70,11 @@ class Preview:
             is the range of motions rather than any single one. Empty films one segment
             of whatever `steps` left running.
         query: Extra URL query, e.g. ``"ref=0"`` to drop the motion-tracking ghost.
+        from_reset: Press `r` just before rolling, so the clip runs from one reset. With
+            `seconds` at the episode length the GIF then loops on the reset rather than
+            cutting across it mid-clip.
+        tilt: Degrees to drop the camera towards the horizon, same drag. Positive lowers
+            it; the authored cameras look down from well above head height.
         orbit: Degrees to swing the camera, as a drag on empty background would. Positive
             adds to the scene's authored `azimuth` (the camera travels anticlockwise seen
             from above). Body tracking keeps whatever angle the drag leaves.
@@ -84,6 +89,8 @@ class Preview:
     motions: tuple[str, ...] = ()
     query: str = ""
     orbit: float = 0.0
+    tilt: float = 0.0
+    from_reset: bool = False
     crop: str = "719:526:120:120"
     seconds: float = 4.0
     settle: float = 2.0
@@ -92,8 +99,8 @@ class Preview:
 #: One entry per task in `ALL_TASKS`; a task with no entry is filmed with the defaults.
 #: Every `orbit` here swings the authored camera round to the robot's front. Which swing
 #: that is, is worth measuring rather than deriving: the scene's authored azimuth is in its
-#: `manifest.json`, but whether a robot spawns facing +x or -x is the task's business (of
-#: these four only husky faces +x). `--shot` settles it in one run.
+#: `manifest.json`, but whether a robot spawns facing +x or -x is the task's business.
+#: `--shot` settles it in one run.
 PREVIEWS: dict[str, Preview] = {
     # Push Speed defaults to 1.0, so the skater is already riding.
     "husky": Preview(orbit=150, crop="719:526:121:127"),
@@ -114,6 +121,15 @@ PREVIEWS: dict[str, Preview] = {
         steps=(("number", "Forward (m/s)", 0.35), ("wait", 1)),
         orbit=140,
         crop="719:526:121:68",
+    ),
+    # Lowered camera: from the authored view a standing body is foreshortened into
+    # mostly floor. 4.84 s is the 484-frame clip, so the GIF is exactly one episode.
+    "musclemimic": Preview(
+        orbit=270,
+        tilt=30,
+        crop="480:351:231:189",
+        from_reset=True,
+        seconds=4.84,
     ),
 }
 
@@ -209,22 +225,25 @@ def _apply(page, step: tuple) -> None:
         raise SystemExit(f"unknown preview step {step!r}")
 
 
-def _orbit(page, degrees: float) -> None:
-    """Swing the camera by dragging empty background, as a visitor would.
+def _orbit(page, degrees: float, tilt: float = 0.0) -> None:
+    """Swing and drop the camera by dragging empty background, as a visitor would.
 
-    OrbitControls turns a full circle per viewport height of horizontal drag, and body
-    tracking only carries the orbit target around, so the angle survives the whole clip.
-    The drag starts in a top corner on purpose: a pointerdown that lands on a body pulls
-    the robot instead (`dragStateManager` takes the drag and OrbitControls sits out).
+    OrbitControls turns a full circle per viewport height of drag, horizontally for the
+    azimuth and vertically for the elevation, and body tracking only carries the orbit
+    target around, so both survive the whole clip. The drag starts in a corner on purpose:
+    a pointerdown that lands on a body pulls the robot instead (`dragStateManager` takes
+    the drag and OrbitControls sits out).
     """
-    if not degrees:
+    if not degrees and not tilt:
         return
     dx = degrees / 360 * HEIGHT
-    x, y = (24, 24) if dx >= 0 else (WIDTH - 24, 24)
+    dy = -tilt / 360 * HEIGHT  # dragging up swings the camera down
+    x = 24 if dx >= 0 else WIDTH - 24
+    y = 24 if dy >= 0 else HEIGHT - 24
     page.mouse.move(x, y)
     page.mouse.down()
     for i in range(1, 21):  # in steps, so the controls integrate it as a real drag
-        page.mouse.move(x + dx * i / 20, y)
+        page.mouse.move(x + dx * i / 20, y + dy * i / 20)
         page.wait_for_timeout(16)
     page.mouse.up()
 
@@ -295,13 +314,18 @@ def film(
             hide.click()
         # The panel leaves a reopen affordance over the canvas; nothing else is a button.
         page.add_style_tag(content="button{display:none!important}")
-        _orbit(page, preview.orbit)
+        _orbit(page, preview.orbit, preview.tilt)
         page.wait_for_timeout(preview.settle * 1000)
 
         if shot is not None:
             page.screenshot(path=str(shot))
             browser.close()
             return start_index
+
+        if preview.from_reset:
+            # The panel's own shortcut, on a window listener, so it still works hidden.
+            # `engine.reset()` leaves the camera alone, so the framing survives.
+            page.keyboard.press("r")
 
         client = context.new_cdp_session(page)
         frames: list[tuple[float, str]] = []
@@ -426,6 +450,11 @@ def main() -> None:
     parser.add_argument(
         "--orbit", type=float, help="override the recipe's camera swing"
     )
+    parser.add_argument(
+        "--tilt",
+        type=float,
+        help="override the recipe's camera drop towards the horizon",
+    )
     parser.add_argument("--crop", help="override the recipe's crop, w:h:x:y of 960x702")
     parser.add_argument(
         "--motion", help="film this motion alone, instead of the recipe's `motions`"
@@ -459,6 +488,7 @@ def main() -> None:
             for key, value in (
                 ("seconds", args.seconds),
                 ("orbit", args.orbit),
+                ("tilt", args.tilt),
                 ("crop", args.crop),
                 ("motions", (args.motion,) if args.motion else None),
             )
@@ -473,7 +503,8 @@ def main() -> None:
         try:
             if args.shot:
                 print(
-                    f"[{task_id}] framing {url} (orbit {preview.orbit:g}, crop {preview.crop})"
+                    f"[{task_id}] framing {url} "
+                    f"(orbit {preview.orbit:g}, tilt {preview.tilt:g}, crop {preview.crop})"
                 )
                 film(
                     url,
