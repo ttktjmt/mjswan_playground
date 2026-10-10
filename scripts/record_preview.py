@@ -244,6 +244,8 @@ PREVIEWS: dict[str, Preview | tuple[Preview, ...]] = {
     "upkie": Preview(orbit=45, crop="540:395:210:170", seconds=5.0),
     # No steps: the twist and the posture command resample every 3-8 s.
     "jumper": Preview(orbit=45, tilt=-20, crop="878:642:41:35", seconds=5.0),
+    # duet's G1 framing. No steps: the twist command resamples every 3-8 s.
+    "unitreerl": Preview(orbit=-30, crop="766:560:97:90", seconds=6.0),
 }
 
 

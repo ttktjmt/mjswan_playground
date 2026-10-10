@@ -19,6 +19,7 @@ A collection of tasks built with [mjswan](https://github.com/ttktjmt/mjswan).
 | [`duet`](src/mjswan_playground/duet/README.md) | Unitree G1 | Walking and squatting down to a 0.18 m crouch ([DUET](https://github.com/bae-air-lab/DUET)) | <img src="assets/duet.gif" width="200"/><br />WIP |
 | [`jumper`](src/mjswan_playground/jumper/README.md) | Jumper | A crab robot walking with a commanded body posture, walking on five legs, dancing, gesturing and jumping ([Jumper](https://github.com/KingKongRobotics/jumper)) | <a href="https://mjswan.com/s/7wT9SwQ"><img src="assets/jumper.gif" width="200"/></a><br />[mjswan.com/s/7wT9SwQ](https://mjswan.com/s/7wT9SwQ) |
 | [`microduckpg`](src/mjswan_playground/microduckpg/README.md) | Microduck | Every experiment of a community playground: running, swing, basketball, stilts, desk and chimney climbs, long jump, backflip ([microduck-playground](https://github.com/Vottivott/microduck-playground)) | <img src="assets/microduckpg.gif" width="200"/><br />WIP |
+| [`unitreerl`](src/mjswan_playground/unitreerl/README.md) | Unitree G1 | Walking to velocity commands with the checkpoint Unitree ships for deployment ([unitree_rl_mjlab](https://github.com/unitreerobotics/unitree_rl_mjlab)) | <img src="assets/unitreerl.gif" width="200"/><br />WIP |
 
 ## CLI
 
