@@ -60,7 +60,7 @@ Once parts A to E have made their last change, review all of them: the diff of e
 
 1. Run `ponytail:ponytail-review` over each diff's code, every changed script and source file, not only its comments. Invoke it when it is in your skill list; otherwise read `.cache/ponytail/skills/ponytail-review/SKILL.md` from the pinned clone msp:add-new-task's step 10 makes. It only lists findings: apply each one that keeps behaviour as it is, and note why for any you leave.
 2. Then run mjswan's `simplify-comments` over the same diffs, following `.claude/commands/simplify-comments.md` in the ttktjmt/mjswan checkout. It touches comments and docstrings only.
-3. Commit what changed on each branch and push. Rerun what the changes touch: `make test`; a task's build, parity and preview (msp:add-new-task steps 6 to 8) when its code changed; and the mjswan PR's own tests when it did. Bring each PR's description up to date with any result that moved.
+3. Commit what changed on each branch and push. Rerun what the changes touch: `make test`; a task's build, parity (`scripts/parity.py <id>`) and preview (msp:add-new-task steps 6 to 8) when its code changed, its own or a shared module it imports; and the mjswan PR's own tests when it did. Bring each PR's description up to date with any result that moved.
 
 Keep each branch's findings, applied or left, and its `net:` line for the report.
 
