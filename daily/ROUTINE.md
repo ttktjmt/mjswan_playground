@@ -2,7 +2,7 @@
 
 What the "mjswan playground daily" routine does each morning. Its prompt only points here, so changing the routine is a pull request against this file.
 
-Each run is a fresh cloud session with ttktjmt/mjswan_playground and ttktjmt/mjswan checked out. It asks nothing: what this file and the backlog leave open is a stop. The parts run in order, and the run ends only after part G has checked its work and the report is published.
+Each run is a fresh cloud session with ttktjmt/mjswan_playground and ttktjmt/mjswan checked out. It asks nothing: what this file and the backlog leave open is a stop. The parts run in order, and the run ends only after part G has checked its work, part H has simplified the comments of every pull request it touched, and the report is published.
 
 A task is one upstream repository with every simulation in it that mjswan can run, each a scene of the task's project, as in `jumper` and `microduckpg`. A simulation is an mjlab task the repository registers, or an experiment it ships, with a trained policy of its own; later checkpoints of one policy are not new simulations.
 
@@ -65,8 +65,7 @@ This run keeps following `main`'s routine: a fix takes effect once a person merg
 Once parts A to E have made their last change, review all of them: the diff of every branch this run pushed, in either repository, against `origin/main` (`git diff origin/main...<branch>`).
 
 1. Run `ponytail:ponytail-review` over each diff's code, every changed script and source file, not only its comments. Invoke it when it is in your skill list; otherwise read `.cache/ponytail/skills/ponytail-review/SKILL.md` from the pinned clone msp:add-new-task's step 10 makes. It only lists findings: apply each one that keeps behaviour as it is, and note why for any you leave.
-2. Then run mjswan's `simplify-comments` over the same diffs, following `.claude/commands/simplify-comments.md` in the ttktjmt/mjswan checkout. It touches comments and docstrings only.
-3. Commit what changed on each branch and push. Rerun what the changes touch: `make test`; a task's build, parity (`scripts/parity.py <id>`) and preview (msp:add-new-task steps 6 to 8) when its code changed, its own or a shared module it imports; and the mjswan PR's own tests when it did. Bring each PR's description up to date with any result that moved.
+2. Commit what changed on each branch and push. Rerun what the changes touch: `make test`; a task's build, parity (`scripts/parity.py <id>`) and preview (msp:add-new-task steps 6 to 8) when its code changed, its own or a shared module it imports; and the mjswan PR's own tests when it did. Bring each PR's description up to date with any result that moved.
 
 Keep each branch's findings, applied or left, and its `net:` line for the report.
 
@@ -87,6 +86,14 @@ Before the report, check every result of this run against GitHub and the files, 
 - A stop's `daily-task-skipped` issue exists, with the step, the error verbatim and what would unblock it.
 - Every branch part F reviewed carries the findings it applied, and the reruns they set off passed.
 
+## H. Simplify comments, last
+
+Once part G has nothing left to fix, every pull request this run opened or updated, in either repository, gets a `/simplify-comments` pass over its whole diff: `git diff origin/main...<branch>`, every file the pull request changes, not only this run's commits. Invoke it when it is in your skill list, otherwise follow `.claude/commands/simplify-comments.md`. It touches comments and docstrings only.
+
+1. Apply what it finds, then run the repository's own checks: `make format` and `make test` here, the mjswan PR's own tests there.
+2. Commit what changed, push, and wait for the checks as part G does. A pass that changes nothing ends here.
+3. Nothing changes a branch after its pass. A change that has to come later, a fix for a red check included, gets another pass over the whole diff.
+
 ## Never
 
 Merge anything; push to `main` of either repository; edit `daily/backlog.yaml` anywhere but on `claude/daily-backlog`; run mjswan's release workflow; run `mjswan login` or `mjswan publish`. Publishing stays with a person.
@@ -95,7 +102,7 @@ Merge anything; push to `main` of either repository; edit `daily/backlog.yaml` a
 
 End every run, a stopped one included, by publishing one Artifact titled `Daily run <YYYY-MM-DD>`, written in Japanese for the owner, then close with its link and a two-line summary. Build it to be read at a glance, pictures first:
 
-- At the top, one card per part, A to F: what it did, or why it did nothing. A stop leads, with the step, the error verbatim and what would unblock it.
+- At the top, one card per part, A to F and H: what it did, or why it did nothing. A stop leads, with the step, the error verbatim and what would unblock it.
 - The new task, whether it reached a pull request or stopped:
   - msp:add-new-task's steps 00 to 11 as a strip, each marked done, skipped, or where the run stopped;
   - its simulations as a table: each one's scene, or that it waits on mjswan or was left out, with why;
@@ -105,6 +112,6 @@ End every run, a stopped one included, by publishing one Artifact titled `Daily 
   - parity, with the terms traced, dropped and skipped; its sources and licenses; and its pull request or issue, with the mjswan PR if one was opened or reused.
 - The scout's new, moved and removed backlog entries as a table: repository, simulations, `popularity` and `ease` with their evidence, license.
 - The waiting PRs touched, each with what changed. After a bump, every task's check as a pass-or-fail grid, naming each first failure.
-- Part E's problems, each with its cause and the change, and its pull request. Part F's findings for each branch, applied or left, with its `net:` line.
+- Part E's problems, each with its cause and the change, and its pull request. Part F's findings for each branch, applied or left, with its `net:` line. Part H's pass on each pull request: what it changed, or that it changed nothing.
 
 Build and publish it the way the Artifact tool's own instructions say, with the images as supporting files and the charts drawn from the data, and put nothing secret on the page. Then read the published page back with the Artifact tool, and republish until every card, image and chart is on it. Without the Artifact tool, end with the same content in Markdown and send the contact sheet as a file.
