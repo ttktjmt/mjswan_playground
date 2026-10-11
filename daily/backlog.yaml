@@ -6,17 +6,17 @@
 #   id           playground id
 #   repo         upstream repository
 #   commit       the commit the entry was reviewed at
-#   simulations  each mjlab task, or experiment, with a trained policy of its own: its
-#                `task`, its `policy` (where the checkpoint is) and its own `ease`
-#   left_out     upstream's other simulations, and why none of them is ported
+#   simulations  each mjlab task or experiment with a trained policy of its own: `task`,
+#                `policy` (where the checkpoint is) and `ease`
+#   left_out     upstream's other simulations, each with why it is not ported
 #   license      everything the build fetches: code, checkpoints, clips, robot assets
 #   popularity   0 to 3, with the stars and posts it rests on (ROUTINE.md, part A)
 #   ease         0 to 3: its simulations' lowest above 0; 0 is a stop for an unattended run
 #   notes        what the port is known to need
 #   found        for an entry the scout added: when, and the evidence
 #
-# An entry with one `task` and `policy` in place of `simulations` predates porting every
-# simulation, and part A vets its repository again.
+# An entry with a single `task` and `policy` still waits for part A to list its
+# repository's simulations.
 
 - id: unitreerl
   repo: https://github.com/unitreerobotics/unitree_rl_mjlab
