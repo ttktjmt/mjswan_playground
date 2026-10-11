@@ -45,8 +45,8 @@ def _add_walk(project: Any, root: Path) -> list[str]:
 
 
 def _add_dance(project: Any, root: Path, joint_names: list[str]) -> None:
-    # The export carries no metadata. Both deploy.yaml files map their policy onto the
-    # robot's motors the same way, so the walk's joint order is the dance's too.
+    # The export carries no metadata; both deploy.yaml files map the motors alike, so the
+    # dance takes the walk's joint order.
     contract = upstream.deploy_contract(root, upstream.DANCE_DIR)
     walk = upstream.deploy_contract(root, upstream.VELOCITY_DIR)
     if contract["joint_ids_map"] != walk["joint_ids_map"]:
