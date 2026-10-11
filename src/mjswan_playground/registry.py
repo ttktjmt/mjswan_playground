@@ -26,9 +26,23 @@ _TASKS: dict[str, str] = {
 
 ALL_TASKS: tuple[str, ...] = tuple(_TASKS)
 
+#: Part ID -> the task module whose ``setup_builder(part)`` builds it: a subset of the
+#: task small enough to upload alone. Not tasks: the README, the site and the previews
+#: show the whole.
+_PARTS: dict[str, str] = dict.fromkeys(
+    ("microduck-moves", "microduck-parkour", "microduck-stilts"),
+    "mjswan_playground.microduckpg.main",
+)
+
+ALL_PARTS: tuple[str, ...] = tuple(_PARTS)
+
 
 def load(task_id: str) -> "mjswan.Builder":
-    """Return the configured builder for ``task_id``, fetching its assets if needed."""
-    if task_id not in _TASKS:
-        raise KeyError(f"Unknown task {task_id!r}. Available: {', '.join(ALL_TASKS)}")
-    return importlib.import_module(_TASKS[task_id]).setup_builder()
+    """Return the configured builder for ``task_id``, a task or a part of one, fetching
+    its assets if needed."""
+    if task_id in _TASKS:
+        return importlib.import_module(_TASKS[task_id]).setup_builder()
+    if task_id in _PARTS:
+        return importlib.import_module(_PARTS[task_id]).setup_builder(task_id)
+    known = ", ".join(ALL_TASKS + ALL_PARTS)
+    raise KeyError(f"Unknown task {task_id!r}. Available: {known}")

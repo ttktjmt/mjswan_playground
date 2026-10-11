@@ -11,7 +11,7 @@ from typing import Annotated, Optional
 import typer
 
 from mjswan_playground import _site
-from mjswan_playground.registry import ALL_TASKS, load
+from mjswan_playground.registry import ALL_PARTS, ALL_TASKS, load
 
 app = typer.Typer(
     name="mjswan-playground",
@@ -19,7 +19,13 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
-TaskId = Annotated[str, typer.Argument(help=f"One of: {', '.join(ALL_TASKS)}.")]
+TaskId = Annotated[
+    str,
+    typer.Argument(
+        help=f"One of: {', '.join(ALL_TASKS)}; or a part to upload alone: "
+        f"{', '.join(ALL_PARTS)}."
+    ),
+]
 
 
 def _build(task_id: str, output_dir: Optional[Path]):
@@ -121,8 +127,8 @@ def _command_slots(node, where: str = ""):
 
 @app.command("list")
 def list_cmd() -> None:
-    """List the available tasks."""
-    for task_id in ALL_TASKS:
+    """List the available tasks, then the parts of them built to upload alone."""
+    for task_id in ALL_TASKS + ALL_PARTS:
         typer.echo(task_id)
 
 

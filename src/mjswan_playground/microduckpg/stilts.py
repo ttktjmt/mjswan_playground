@@ -124,7 +124,9 @@ def _scene_spec(
     return spec
 
 
-def add_scenes(project: mjswan.ProjectHandle, root: Path) -> None:
+def add_scenes(
+    project: mjswan.ProjectHandle, root: Path, heights_cm: tuple[int, ...] = HEIGHTS_CM
+) -> None:
     stand_pose = _stand_pose(root / _common.WALK_SCENE_XML)
     # One trace env for every height: the traced terms read only the joints and the
     # root, which the stilts leave alone, and each env holds a compiled mujoco_warp model.
@@ -133,7 +135,7 @@ def add_scenes(project: mjswan.ProjectHandle, root: Path) -> None:
         entity_name=ENTITY,
         commands={"twist": CommandValues(3)},
     )
-    for height_cm in HEIGHTS_CM:
+    for height_cm in heights_cm:
         spec = _scene_spec(root, stand_pose, height_cm)
         joint_names = _common.servo_joints(spec)
         joints = _common.joints_cfg(joint_names)
