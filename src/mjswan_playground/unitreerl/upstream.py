@@ -1,40 +1,41 @@
-"""The DUET checkout: pinned clone, task ids registered and the deployed contract."""
+"""The unitree_rl_mjlab checkout: pinned clone and task ids registered."""
 
 from __future__ import annotations
 
 import importlib
-import json
 import sys
 from pathlib import Path
 
-from mjswan_playground._compat import (
-    collision_defaults,
-    dropping_env_ids,
-    legacy_update_assets,
-)
+import yaml
+
+from mjswan_playground._compat import collision_defaults, legacy_update_assets
 from mjswan_playground._deps import ensure_repo
 
-REPO_URL = "https://github.com/bae-air-lab/DUET.git"
-REPO_COMMIT = "439c21bd2817feedd519475e8301195b95cb6fcb"
+REPO_URL = "https://github.com/unitreerobotics/unitree_rl_mjlab.git"
+REPO_COMMIT = "1425b15f73bd4095f0df53709d7c389c3eb9e790"
 
-TASK_PACKAGE = "src.tasks.duet.config.g1_23dof"
-#: model_15500, the checkpoint the README deploys; ``exported/`` holds two later ones.
-POLICY_ONNX = "exported/policy.onnx"
-CONTRACT = "exported/deploy_contract.json"
+#: Importing it imports upstream's ``src.tasks``, which registers every task id.
+TASK_PACKAGE = "src.tasks.velocity.config.g1"
+VELOCITY_DIR = "deploy/robots/g1/config/policy/velocity/v0"
+DANCE_DIR = "deploy/robots/g1/config/policy/mimic/dance1_subject2"
+POLICY_ONNX = f"{VELOCITY_DIR}/exported/policy.onnx"
+DANCE_ONNX = f"{DANCE_DIR}/exported/policy.onnx"
+DANCE_CLIP = f"{DANCE_DIR}/params/dance1_subject2.npz"
 
 
 def resolve_root() -> Path:
     return ensure_repo(
-        name="duet",
+        name="unitree_rl_mjlab",
         url=REPO_URL,
         commit=REPO_COMMIT,
         marker=POLICY_ONNX,
-        root_env_var="MJSWAN_DUET_ROOT",
+        root_env_var="MJSWAN_UNITREERL_ROOT",
     )
 
 
-def deployed_contract(root: Path) -> dict:
-    return json.loads((root / CONTRACT).read_text())
+def deploy_contract(root: Path, policy_dir: str) -> dict:
+    """The ``deploy.yaml`` Unitree's controller reads beside a policy."""
+    return yaml.safe_load((root / policy_dir / "params" / "deploy.yaml").read_text())
 
 
 def register_tasks(root: Path) -> None:
@@ -59,7 +60,3 @@ def register_tasks(root: Path) -> None:
     # ponytail: upstream is on mjlab 1.2.0; drop the shims once REPO_COMMIT is on 1.6.
     with collision_defaults(), legacy_update_assets():
         importlib.import_module(TASK_PACKAGE)
-    commands = importlib.import_module("src.tasks.common.mdp.commands")
-    for name in ("_update_command", "compute"):
-        method = vars(commands.BaseHeightCommand)[name]
-        setattr(commands.BaseHeightCommand, name, dropping_env_ids(method))

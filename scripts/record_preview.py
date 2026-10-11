@@ -244,6 +244,21 @@ PREVIEWS: dict[str, Preview | tuple[Preview, ...]] = {
     "upkie": Preview(orbit=45, crop="540:395:210:170", seconds=5.0),
     # No steps: the twist and the posture command resample every 3-8 s.
     "jumper": Preview(orbit=45, tilt=-20, crop="878:642:41:35", seconds=5.0),
+    # No steps: the walk's twist command resamples every 3-8 s. The dance cut starts 18 s
+    # into the clip, once the dancing picks up; the policy loses the clip partway, in
+    # mjlab too, and its ee_body_pos termination starts the clip over.
+    "unitreerl": (
+        Preview(scene="unitree_g1_flat", orbit=-30, crop="766:560:97:90", seconds=4.0),
+        Preview(
+            scene="unitree_g1_tracking_no_state_estimation",
+            query="ref=0",
+            orbit=-30,
+            crop="766:560:97:90",
+            settle=18,
+            seconds=5.0,
+            ok_terminations=("ee_body_pos",),
+        ),
+    ),
 }
 
 
