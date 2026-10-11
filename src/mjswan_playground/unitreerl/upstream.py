@@ -6,14 +6,21 @@ import importlib
 import sys
 from pathlib import Path
 
+import yaml
+
 from mjswan_playground._compat import collision_defaults, legacy_update_assets
 from mjswan_playground._deps import ensure_repo
 
 REPO_URL = "https://github.com/unitreerobotics/unitree_rl_mjlab.git"
 REPO_COMMIT = "1425b15f73bd4095f0df53709d7c389c3eb9e790"
 
+#: Importing it imports upstream's ``src.tasks``, which registers every task id.
 TASK_PACKAGE = "src.tasks.velocity.config.g1"
-POLICY_ONNX = "deploy/robots/g1/config/policy/velocity/v0/exported/policy.onnx"
+VELOCITY_DIR = "deploy/robots/g1/config/policy/velocity/v0"
+DANCE_DIR = "deploy/robots/g1/config/policy/mimic/dance1_subject2"
+POLICY_ONNX = f"{VELOCITY_DIR}/exported/policy.onnx"
+DANCE_ONNX = f"{DANCE_DIR}/exported/policy.onnx"
+DANCE_CLIP = f"{DANCE_DIR}/params/dance1_subject2.npz"
 
 
 def resolve_root() -> Path:
@@ -24,6 +31,11 @@ def resolve_root() -> Path:
         marker=POLICY_ONNX,
         root_env_var="MJSWAN_UNITREERL_ROOT",
     )
+
+
+def deploy_contract(root: Path, policy_dir: str) -> dict:
+    """The ``deploy.yaml`` Unitree's controller reads beside a policy."""
+    return yaml.safe_load((root / policy_dir / "params" / "deploy.yaml").read_text())
 
 
 def register_tasks(root: Path) -> None:

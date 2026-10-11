@@ -1,1 +1,1 @@
-"""Unitree G1 walking to velocity commands, from Unitree's unitree_rl_mjlab."""
+"""Unitree G1 walking and dancing, from Unitree's unitree_rl_mjlab."""
