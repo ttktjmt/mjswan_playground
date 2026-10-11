@@ -1,13 +1,10 @@
-"""Check a task's traced graphs against mjlab, on the env its ``main.py`` builds.
+"""Check a task's traced graphs against mjlab, on every scene its ``main.py`` builds.
 
     MUJOCO_GL=disable uv run --with onnxruntime python scripts/parity.py <task-id>
 
-Runs ``setup_builder()`` with ``add_scene_mjlab`` stubbed to collect the ``env_cfg`` of
-every scene, imports the task's ``terms.py`` if it has one, then for each scene runs
-``run_parity`` on the actor's observation group and ``run_command_parity`` on every
-traced command. A tracking task
-whose env config leaves the clip unset takes one with ``--motion-file``, since the env
-loads it on construction. Exits 1 when anything fails.
+``setup_builder()`` runs with ``add_scene_mjlab`` stubbed, to collect each scene's
+``env_cfg``. A tracking task whose ``env_cfg`` leaves the clip unset takes
+``--motion-file``, since the env loads it on construction. Exits 1 when anything fails.
 """
 
 from __future__ import annotations
