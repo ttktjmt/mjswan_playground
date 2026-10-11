@@ -4,21 +4,27 @@ What the "mjswan playground daily" routine does each morning. Its prompt only po
 
 Each run is a fresh cloud session with ttktjmt/mjswan_playground and ttktjmt/mjswan checked out. It asks nothing: what this file and the backlog leave open is a stop. The parts run in order, and the run ends only after part G has checked its work and the report is published.
 
+A task is one upstream repository with every simulation in it that mjswan can run, each a scene of the task's project, as in `jumper` and `microduckpg`. A simulation is an mjlab task the repository registers, or an experiment it ships, with a trained policy of its own; later checkpoints of one policy are not new simulations.
+
+The run works on Opus at max effort. Its environment sets that (`README.md`, one-time setup: `ANTHROPIC_MODEL=opus`, `CLAUDE_CODE_EFFORT_LEVEL=max`), and every subagent the run starts gets `model: opus` and `effort: max` as well. A run whose environment lacks either variable goes on, and its report leads with the gap.
+
 ## A. Scout and rank the backlog
 
-The backlog is ranked on two things weighed equally: how much attention a task draws, and how likely an unattended run is to port it without a change to mjswan that only it would use. A task that is famous but hard, or easy but little known, waits behind one that is fairly well known and fairly easy.
+The backlog is ranked on two things weighed equally: how much attention a repository draws, and how likely an unattended run is to port its simulations without a change to mjswan that only they would use. A repository that is famous but hard, or easy but little known, waits behind one that is fairly well known and fairly easy.
 
 1. Search for repositories built on mjlab: the `mjlab` topic on GitHub (github.com/topics/mjlab, sorted by stars and by recently updated), a GitHub search for `mjlab` sorted by stars, mjlab's "Show and tell" discussions, and the web for posts, project pages and papers about mjlab releases (X, Reddit, Hacker News, YouTube, arXiv). Read GitHub's web pages with WebFetch and public repositories with plain `git`: the session's GitHub tools reach only the attached repositories, and the proxy refuses `curl` to github.com and api.github.com.
-2. Vet each repository that is not already in the backlog, in `mjswan_playground.registry.ALL_TASKS`, in a PR, or in a `daily-task-skipped` issue:
+2. Vet each repository that is not already in the backlog, in `mjswan_playground.registry.ALL_TASKS`, in a PR, or in a `daily-task-skipped` issue, and each entry that still names one `task` rather than its `simulations`. List every mjlab task it registers and every experiment it ships, and vet each as a simulation:
    - its env config is mjlab's `ManagerBasedRlEnvCfg`, registered with mjlab or buildable from upstream's code for the port to register;
    - a trained policy is public at a pinned source (git, a release asset, the Hub, a public W&B run), and so is a tracking task's clip unless the ONNX carries it;
    - mjswan can run its actuators: mjlab's own classes, or a subclass that mjswan runs as its base (an `IdealPdActuatorCfg` subclass runs as PD within its effort limit), with the entry naming what that drops; or, for a robot a task here already runs data-only, the actuators that task runs (`microduck`: BAM in training, the MJCF's `<position>` servos in the browser), with the entry naming the training lags the policy needs;
    - the license of everything the build fetches is known. Any license will do, as long as the entry states it: an NC or SA one is the author's to weigh when publishing.
-3. Score each one that passes, and every untried entry again with its stars refreshed:
+
+   A simulation that fails a check goes in the entry's `left_out`, with why; a repository with no simulation that passes is not an entry.
+3. Score each new entry, and every untried entry again with its stars refreshed:
    - `popularity`: 3 for 1,000 stars or more, or a post that reached a front page or 100k views; 2 for 200 to 999 stars, or a post with thousands of views; 1 for 50 to 199 stars; 0 below 50.
-   - `ease`: 3 when mjswan runs it as it is, with mjlab's own action, actuator and command classes and at most a few `terms.py` rewrites or version shims; 2 when it needs several task-specific rewrites on the playground side (command bindings, stateful terms recast as commands, its own registry), a simulation the browser may not keep up with (physics above 500 Hz or control above 50 Hz), or a generic mjswan extension (msp:add-new-task step 9) with little else to rewrite; 1 for a generic extension on top of several rewrites, or a policy whose task or license is unverified; 0 when it needs a change to mjswan that only it would use, such as an action term its own repository defines, or has no usable policy.
-4. Order `daily/backlog.yaml` by `popularity` plus `ease`, highest first. An entry with `ease` 0, which an unattended run will stop on, goes after every other. Break a tie with a robot or task type the playground does not have yet, then with more stars. A new entry gets every field filled, its two scores with their evidence, and a `found` line giving the date.
-5. Commit on `claude/daily-backlog`, cut from `main` or with `main` merged in, and open or update its PR, labelled `daily-backlog`, listing each new or moved entry with its scores. No new entry and no change in order: change nothing.
+   - `ease`, for each simulation that passed: 3 when mjswan runs it as it is, with mjlab's own action, actuator and command classes and at most a few `terms.py` rewrites or version shims; 2 when it needs several task-specific rewrites on the playground side (command bindings, stateful terms recast as commands, its own registry), a simulation the browser may not keep up with (physics above 500 Hz or control above 50 Hz), or a generic mjswan extension (msp:add-new-task step 9) with little else to rewrite; 1 for a generic extension on top of several rewrites, or a policy whose task or license is unverified; 0 when it needs a change to mjswan that only it would use, such as an action term its own repository defines, or has no usable policy. The entry's `ease` is the lowest of these above 0, or 0 when all are 0: a simulation at 0 does not hold back the rest.
+4. Remove every entry a task on `main` already ports: its id is in `ALL_TASKS`, or its pull request from `claude/daily-<id>` was merged (a port can rename its task, as `microduck_playground` became `microduckpg`). Order the rest of `daily/backlog.yaml` by `popularity` plus `ease`, highest first. An entry with `ease` 0, which an unattended run will stop on, goes after every other. Break a tie with a robot or task type the playground does not have yet, then with more stars. A new entry gets every field filled: each simulation with its task, policy and `ease` with its evidence, `popularity` with its evidence, and a `found` line giving the date.
+5. Commit on `claude/daily-backlog`, cut from `main` or with `main` merged in, and open or update its PR, labelled `daily-backlog`, listing each new, moved or removed entry with its scores. Nothing new, moved or removed: change nothing.
 
 Until a person merges that PR, the backlog for part D is the one on its branch.
 
@@ -35,14 +41,14 @@ For each open pull request labelled `needs-mjswan`, which links one ttktjmt/mjsw
 
 PyPI has a stable mjswan newer than the one `main` locks, and no open PR is labelled `mjswan-bump`: on `claude/mjswan-bump-<version>`, raise the floor in `pyproject.toml` (and the `mjlab` pin if mjswan's `mjlab` extra moved), `uv lock`, build every task, run `make test`, check every task's run with `scripts/record_preview.py --all --out-dir` a scratch directory (msp:add-new-task step 7 has the cloud flags), and open the PR labelled `mjswan-bump` with each task's check result.
 
-## D. One new task
+## D. One new task, with every simulation in it
 
 Skipped while three or more `needs-mjswan` PRs are open.
 
 1. Pick the first backlog entry whose id is not in `mjswan_playground.registry.ALL_TASKS`, has no PR from `claude/daily-<id>` in any state, and has no open `daily-task-skipped` issue. None left: open one issue titled "Daily backlog is empty", unless one is open.
-2. Run msp:add-new-task in unattended mode on branch `claude/daily-<id>`, with the entry as every answer: `repo` the target and `commit` the commit to pin, `id` the playground id, `task` the mjlab task, `license` the license, and `policy` and `notes` what they say. When the skill is not in your skill list, follow `.claude/skills/msp/skills/add-new-task/SKILL.md` directly. Its step 9 may open or reuse an mjswan PR, on branch `claude/playground-<id>` of ttktjmt/mjswan.
+2. Run msp:add-new-task in unattended mode on branch `claude/daily-<id>`, with the entry as every answer: `repo` the target and `commit` the commit to pin, `id` the playground id, `simulations` what to port, each with its `task` and `policy`, `license` the license, and `left_out` and `notes` what they say. It ports every simulation listed, and any the entry missed that passes part A's checks. When the skill is not in your skill list, follow `.claude/skills/msp/skills/add-new-task/SKILL.md` directly. Its step 9 may open or reuse an mjswan PR, on branch `claude/playground-<id>` of ttktjmt/mjswan.
 3. Label the PR `daily-task`.
-4. On a stop: open, or update, an issue labelled `daily-task-skipped` and titled `<id>: <reason>`, with the step, the error verbatim and what would unblock it.
+4. On a stop, which leaves no simulation to land: open, or update, an issue labelled `daily-task-skipped` and titled `<id>: <reason>`, with the step, the error verbatim and what would unblock it. A simulation the port tried and left out gets the same issue, titled `<id> <task>: <reason>`.
 
 ## E. Fix the routine
 
@@ -72,11 +78,12 @@ Before the report, check every result of this run against GitHub and the files, 
 - Every pull request this run opened or updated: it targets `main` and carries its labels (`daily-backlog`, `daily-routine`, `daily-task`, `mjswan-bump`, or `needs-mjswan` on a draft). Its checks have finished green on its current head: wait for them, up to 30 minutes. Root-cause a red check, fix it, push and wait again; one that is red on `main` too is noted, not fixed here. A `needs-mjswan` draft's `released-mjswan` check is red by design.
 - The pull request of a task this run added or finished holds the whole task:
   - `src/mjswan_playground/<id>/`, with a README that opens with the GIF;
-  - the registry line, the README row, `assets/<id>.gif` and its `PREVIEWS` entry;
+  - a scene for each simulation in its backlog entry, unless the pull request names it as left out, with why;
+  - the registry line, the README row, `assets/<id>.gif` and its `PREVIEWS` entry, with a cut for every scene;
   - nothing from `.cache/` or `dist/`.
 
-  Its last preview round passed (`"passed": true` in `dist/preview/<id>.json`), and the committed GIF is that round's. A fresh worktree of the pushed head passes `make sync`, `make test` and `uv run msp build <id>`, so nothing the build needs was left uncommitted.
-- `daily/backlog.yaml` on the backlog branch parses, and every new entry has every field.
+  Its last preview round passed (`"passed": true` in `dist/preview/<id>.json`), and the committed GIF is that round's. `scripts/parity.py <id>` passes on every scene. A fresh worktree of the pushed head passes `make sync`, `make test` and `uv run msp build <id>`, so nothing the build needs was left uncommitted.
+- `daily/backlog.yaml` on the backlog branch parses, every new entry has every field, and no entry is one `main` already ports.
 - A stop's `daily-task-skipped` issue exists, with the step, the error verbatim and what would unblock it.
 - Every branch part F reviewed carries the findings it applied, and the reruns they set off passed.
 
@@ -91,11 +98,12 @@ End every run, a stopped one included, by publishing one Artifact titled `Daily 
 - At the top, one card per part, A to F: what it did, or why it did nothing. A stop leads, with the step, the error verbatim and what would unblock it.
 - The new task, whether it reached a pull request or stopped:
   - msp:add-new-task's steps 00 to 11 as a strip, each marked done, skipped, or where the run stopped;
+  - its simulations as a table: each one's scene, or that it waits on mjswan or was left out, with why;
   - the preview GIF and its contact sheet, `dist/preview/<id>.png`, published as the page's own files;
-  - a chart of the checked run from `dist/preview/<id>.json`: root height and tilt over the control steps, the filmed part shaded, every termination marked;
+  - a chart of each cut's checked run from `dist/preview/<id>.json`: root height and tilt over the control steps, the filmed part shaded, every termination marked;
   - the preview's rounds as a table, each failure beside its fix;
   - parity, with the terms traced, dropped and skipped; its sources and licenses; and its pull request or issue, with the mjswan PR if one was opened or reused.
-- The scout's new and moved backlog entries as a table: repository, `popularity` and `ease` with their evidence, license.
+- The scout's new, moved and removed backlog entries as a table: repository, simulations, `popularity` and `ease` with their evidence, license.
 - The waiting PRs touched, each with what changed. After a bump, every task's check as a pass-or-fail grid, naming each first failure.
 - Part E's problems, each with its cause and the change, and its pull request. Part F's findings for each branch, applied or left, with its `net:` line.
 

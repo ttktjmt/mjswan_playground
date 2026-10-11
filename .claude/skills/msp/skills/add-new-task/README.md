@@ -1,6 +1,6 @@
 # add-new-task
 
-An agent skill that adds one task to this playground from any repo that registers mjlab tasks, given as a GitHub URL or a local path. The port itself is mjswan's [`mjlab-to-mjswan`](https://github.com/ttktjmt/mjswan/tree/main/skills/mjlab-to-mjswan) skill; this one lands it as `src/mjswan_playground/<task-id>/`, wires it in, reviews the diff and opens a pull request for that task alone.
+An agent skill that adds one task to this playground from any repo that registers mjlab tasks, given as a GitHub URL or a local path. The task holds every simulation in that repo that mjswan can run: each mjlab task, or experiment, with a trained policy of its own becomes a scene. The port itself is mjswan's [`mjlab-to-mjswan`](https://github.com/ttktjmt/mjswan/tree/main/skills/mjlab-to-mjswan) skill; this one lands it as `src/mjswan_playground/<task-id>/`, wires it in, reviews the diff and opens a pull request for that task alone.
 
 ## Usage
 
@@ -64,15 +64,15 @@ Nothing else binary is committed: checkpoints, clips and upstream code are fetch
 - a checkpoint or clip that is not published anywhere pinned (a `.pt` on someone's disk);
 - an upstream whose env config cannot be adapted: the `husky` / `microduck` shape, proposed but not built;
 - a preview whose run still fails its checks after five rounds of fixes;
-- in unattended mode, any question the caller left unanswered, a license the caller's answer does not cover, or more than one mjlab task with a published checkpoint.
+- in unattended mode, any question the caller left unanswered, or a license the caller's answer does not cover.
 
-A stop commits nothing and opens nothing.
+These are judged one simulation at a time. A simulation that hits one is left out, and the pull request names it with what would unblock it; the rest still land. Only when no simulation is left does the skill stop, and a stop commits nothing and opens nothing.
 
 ## When mjswan itself is missing something
 
-A generic gap becomes a pull request against mjswan, as mjswan's skill says. The task is finished against that PR's commit and waits as a draft labelled `needs-mjswan`; the `released-mjswan` check keeps it off `main`. Once an mjswan release with the change is locked on `main`, the pin is dropped, the task is verified again, and the PR is marked ready.
+A generic gap becomes a pull request against mjswan, as mjswan's skill says. The task is finished against that PR's commit and waits as a draft labelled `needs-mjswan`; the `released-mjswan` check keeps it off `main`. Once an mjswan release with the change is locked on `main`, the pin is dropped, the task is verified again, and the PR is marked ready. When only some simulations need the change, the rest land without it, and the waiting ones get a draft of their own.
 
 ## What it will not do
 
 - Merge anything, or publish to mjswan Cloud: `uv run mjswan publish dist/<id>` is the author's call.
-- Put two tasks in one pull request.
+- Put two repositories in one pull request, or one repository in two tasks.

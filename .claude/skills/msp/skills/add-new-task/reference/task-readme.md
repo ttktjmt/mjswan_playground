@@ -45,6 +45,7 @@ and that the demo is published only by its author.>
 
 - The Source line credits everything the demo uses, each with its license: the code, the checkpoint and the clips when they live elsewhere, and a motion's origin.
 - The preview GIF from step 7 opens the README, under the title. Drop the image when the preview did not film.
+- With several simulations, list them after the opening sentence, one line or table row per scene saying what it does, and give "Run" a table of each scene's policies, upstream task and checkpoint (`jumper`, `microduckpg`). Name the simulations upstream ships that the task leaves out, and why.
 - Drop the quote block when there is no paper, and the License section when everything is permissive.
 - Add a section only when it earns its place, as the existing ones do: "What the policy reads" for the observation layout (all but `wbc`), "How it behaves" (`pacman`), "The one known gap" (`microduck`).
 - Wrap prose at about 90 columns, separate the sources with `·`, and use no em dashes.
