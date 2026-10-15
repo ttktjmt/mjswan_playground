@@ -376,6 +376,18 @@ PREVIEWS: dict[str, Preview | tuple[Preview, ...]] = {
             upright=False,
         ),
     ),
+    # Each clip's opening seconds, from a reset. A tighter crop for the K1, a short robot.
+    "boosterdeploy": tuple(
+        Preview(
+            scene=scene,
+            query="debug=0",
+            orbit=150,
+            crop="540:395:190:166",
+            from_reset=True,
+            seconds=5.0,
+        )
+        for scene in ("k1_mj_dance", "k1_fight")
+    ),
 }
 
 

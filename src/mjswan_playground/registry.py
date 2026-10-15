@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 _TASKS: dict[str, str] = {
     "asimov": "mjswan_playground.asimov.main",
     "bipedhrl": "mjswan_playground.bipedhrl.main",
+    "boosterdeploy": "mjswan_playground.boosterdeploy.main",
     "duet": "mjswan_playground.duet.main",
     "husky": "mjswan_playground.husky.main",
     "jumper": "mjswan_playground.jumper.main",
