@@ -47,8 +47,8 @@ booster_deploy's own MuJoCo run does:
 
 | | MJ dance: booster_deploy / here | Fight: booster_deploy / here |
 |---|---|---|
-| Mean anchor position error | 0.164 / 0.147 m | 0.295 / 0.316 m |
-| Mean joint position error (norm over 22 joints) | 0.553 / 0.549 rad | 1.507 / 1.501 rad |
+| Mean anchor position error | 0.164 / 0.147 m | 0.295 / 0.297 m |
+| Mean joint position error (norm over 22 joints) | 0.553 / 0.549 rad | 1.507 / 1.503 rad |
 | Largest tilt | 24.1 / 24.1° | 34.9 / 35.0° |
 
 ## What the policy reads
