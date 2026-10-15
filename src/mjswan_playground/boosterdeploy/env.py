@@ -95,21 +95,9 @@ def _robot_cfg(xml: Path, task: Any) -> EntityCfg:
     )
 
 
-def action_scale(task: Any) -> dict[str, float]:
-    """`BeyondMimicPolicy`'s: a fixed scale, or a factor of effort limit over stiffness."""
-    robot, policy = task.robot, task.policy
-    if policy.fixed_action_scale is not None:
-        scales = list(policy.fixed_action_scale)
-    else:
-        factors = policy.action_scale_factors or [0.25] * len(robot.joint_names)
-        scales = [
-            f * limit / kp
-            for f, limit, kp in zip(factors, robot.effort_limit, robot.joint_stiffness)
-        ]
-    return dict(zip(robot.joint_names, scales))
-
-
-def tracking_env_cfg(task: Any, xml: Path) -> ManagerBasedRlEnvCfg:
+def tracking_env_cfg(task: Any, assets: Path) -> ManagerBasedRlEnvCfg:
+    robot = task.robot
+    xml = Path(robot.mjcf_path.replace("{BOOSTER_ASSETS_DIR}", str(assets)))
     cfg = make_tracking_env_cfg()
     cfg.scene.entities = {"robot": _robot_cfg(xml, task)}
 
@@ -127,7 +115,15 @@ def tracking_env_cfg(task: Any, xml: Path) -> ManagerBasedRlEnvCfg:
     }
     action = cfg.actions["joint_pos"]
     assert isinstance(action, JointPositionActionCfg)
-    action.scale = action_scale(task)
+    # `BeyondMimicPolicy`'s default, which both K1 tasks keep.
+    assert task.policy.action_scale_factors is None
+    assert task.policy.fixed_action_scale is None
+    action.scale = {
+        name: 0.25 * limit / kp
+        for name, limit, kp in zip(
+            robot.joint_names, robot.effort_limit, robot.joint_stiffness
+        )
+    }
 
     motion = cfg.commands["motion"]
     assert isinstance(motion, MotionCommandCfg)
@@ -147,8 +143,7 @@ def tracking_env_cfg(task: Any, xml: Path) -> ManagerBasedRlEnvCfg:
     cfg.decimation = task.mujoco.decimation
     cfg.sim.mujoco = MujocoCfg(
         timestep=task.mujoco.physics_dt,
-        # The MJCF's own options, which booster_deploy keeps: MuJoCo's Euler
-        # integrator, impratio 10 and tolerance 1e-6.
+        # The MJCF's own solver options, which booster_deploy keeps.
         integrator="euler",
         impratio=10.0,
         tolerance=1e-6,

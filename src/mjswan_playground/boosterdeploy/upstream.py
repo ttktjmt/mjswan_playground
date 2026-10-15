@@ -43,18 +43,14 @@ def resolve_roots() -> tuple[Path, Path]:
     return deploy, assets
 
 
-def task_cfg(root: Path, robot: str, name: str) -> Any:
-    """A task booster_deploy registers, with its robot's gains and its policy's paths."""
+def task_cfg(root: Path, name: str) -> Any:
+    """A K1 task booster_deploy registers, with its gains and its policy's paths."""
     if str(root) not in sys.path:
         sys.path.insert(0, str(root))
-    importlib.import_module(f"tasks.beyond_mimic.robots.{robot}")
+    importlib.import_module("tasks.beyond_mimic.robots.k1")
     from booster_deploy.utils.registry import get_task
 
     return get_task(name)
-
-
-def model_xml(assets: Path, task: Any) -> Path:
-    return Path(task.robot.mjcf_path.replace("{BOOSTER_ASSETS_DIR}", str(assets)))
 
 
 def policy_onnx(root: Path, task: Any) -> onnx.ModelProto:
@@ -64,16 +60,19 @@ def policy_onnx(root: Path, task: Any) -> onnx.ModelProto:
     to_sim = [robot.joint_names.index(name) for name in robot.sim_joint_names]
     to_model = [robot.sim_joint_names.index(name) for name in robot.joint_names]
     n = len(to_sim)
-    # The observation: the clip's joint positions and velocities, the anchor's
-    # orientation (6) and angular velocity (3), then joint positions, velocities and
-    # the last action.
-    blocks = [0, n, None, 2 * n + 9, 3 * n + 9, 4 * n + 9]
+
+    def joints(start: int) -> list[int]:
+        return [start + j for j in to_sim]
+
+    # The clip's joint positions and velocities, the anchor's orientation (6) and the
+    # trunk's angular velocity (3), then joint positions, velocities and the last action.
     obs_order = [
-        i
-        for start in blocks
-        for i in (
-            range(2 * n, 2 * n + 9) if start is None else (start + j for j in to_sim)
-        )
+        *joints(0),
+        *joints(n),
+        *range(2 * n, 2 * n + 9),
+        *joints(2 * n + 9),
+        *joints(3 * n + 9),
+        *joints(4 * n + 9),
     ]
 
     module = torch.jit.load(root / BEYOND_MIMIC / task.policy.checkpoint_path, "cpu")
@@ -145,25 +144,24 @@ def _replay(clip: Any, robot_cfg: Any, env_cfg: Any) -> dict[str, np.ndarray]:
     from mjlab.sim.sim import Simulation
     from mjlab.utils.lab_api.math import quat_apply, quat_inv, quat_mul, yaw_quat
 
-    fps = float(np.asarray(clip["fps"]).reshape(-1)[0])
+    fps = float(clip["fps"][0])
     # booster_deploy's clips carry Isaac Lab's joint and body order, the root body first.
     to_model = [robot_cfg.sim_joint_names.index(name) for name in robot_cfg.joint_names]
     joint_pos = torch.from_numpy(clip["joint_pos"][:, to_model])
     joint_vel = torch.from_numpy(clip["joint_vel"][:, to_model])
     root_pos = torch.from_numpy(clip["body_pos_w"][:, 0])
     root_quat = torch.from_numpy(clip["body_quat_w"][:, 0])
+    root_lin_vel = torch.from_numpy(clip["body_lin_vel_w"][:, 0])
     root_ang_vel = torch.from_numpy(clip["body_ang_vel_w"][:, 0])
 
-    # `align_to_first_frame`, as booster_deploy loads the clip: start at the origin,
-    # facing +x.
+    # As booster_deploy loads it (`align_to_first_frame`): from the origin, facing +x.
     yaw_inv = quat_inv(yaw_quat(root_quat[:1])).repeat(root_quat.shape[0], 1)
     origin = root_pos[:1].clone()
     origin[:, 2] = 0.0
     root_pos = quat_apply(yaw_inv, root_pos - origin)
     root_quat = quat_mul(yaw_inv, root_quat)
+    root_lin_vel = quat_apply(yaw_inv, root_lin_vel)
     root_ang_vel = quat_apply(yaw_inv, root_ang_vel)
-    # The link's own velocity, where the clip records the center of mass's.
-    root_lin_vel = torch.gradient(root_pos, spacing=1.0 / fps, dim=0)[0]
 
     scene_cfg = copy.deepcopy(env_cfg.scene)
     scene_cfg.num_envs = 1

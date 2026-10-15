@@ -20,8 +20,8 @@ def setup_builder() -> mjswan.Builder:
     builder = mjswan.Builder()
     project = builder.add_project(name="booster_deploy", license=deploy / "LICENSE")
     for scene_name, task_name, clip_name in SIMULATIONS:
-        task = upstream.task_cfg(deploy, "k1", task_name)
-        env_cfg = env.tracking_env_cfg(task, upstream.model_xml(assets, task))
+        task = upstream.task_cfg(deploy, task_name)
+        env_cfg = env.tracking_env_cfg(task, assets)
         clip = upstream.clip_npz(deploy, task, env_cfg)
         motion = env_cfg.commands["motion"]
         motion.motion_file = str(clip)
