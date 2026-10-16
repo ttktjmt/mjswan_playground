@@ -398,6 +398,17 @@ PREVIEWS: dict[str, Preview | tuple[Preview, ...]] = {
             for scene in ("k1_mj_dance", "k1_fight")
         ),
     ),
+    # Forward on the joystick: left alone, the twist can stand still a while.
+    "luwu": tuple(
+        Preview(
+            scene=scene,
+            steps=(("check", "twist:enabled", True), ("number", "lin_vel_x", 0.4)),
+            orbit=-30,
+            crop="480:351:230:175",
+            seconds=3.0,
+        )
+        for scene in ("mini2s_walk_flat", "mini2sw_walk_flat", "lite3_walk_flat")
+    ),
 }
 
 
