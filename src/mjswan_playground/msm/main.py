@@ -19,25 +19,26 @@ from . import terms, upstream
 SCENES = {"MS-Human-700": upstream.MS_HUMAN_700, "MyoFullBody": upstream.MYOFULLBODY}
 
 
-def play_env_cfg(body: upstream.Body, root: Path) -> tuple[Any, Path]:
-    """The body's play config as the browser runs it, and its decoder."""
+def play_env_cfg(
+    body: upstream.Body, root: Path
+) -> tuple[Any, Path, list[upstream.Clip], list[str]]:
+    """The body's play config as the browser runs it, its decoder, its clips and its
+    joints in the clips' order."""
     from muscle_supermimic.tasks.tracking.mdp.kinematics import SkeletonKinematics
 
     env_cfg = load_env_cfg(body.task_id, play=True)
-    onnx_path, tables = upstream.ensure_policy(body, root, env_cfg)
-    command = env_cfg.commands["motion"]
+    onnx_path, clips = upstream.ensure_policy(body, root, env_cfg)
+    tracked = env_cfg.commands["motion"].body_names
     (sensor,) = env_cfg.scene.sensors
     # Keeps the last substep's reading, which the touch observation reads (`terms`).
     sensor.history_length = 1
+    kin = SkeletonKinematics(
+        tracked, "cpu", env_cfg.scene.entities["robot"].spec_fn().compile()
+    )
     contract = terms.build_terms(
         Scene(env_cfg.scene, device="cpu").spec.compile(),
-        SkeletonKinematics(
-            command.body_names,
-            "cpu",
-            env_cfg.scene.entities["robot"].spec_fn().compile(),
-        ),
-        tables,
-        tracked=command.body_names,
+        kin,
+        tracked=tracked,
         touch=sensor.name,
         thresholds={
             name: term.params["threshold"]
@@ -46,7 +47,14 @@ def play_env_cfg(body: upstream.Body, root: Path) -> tuple[Any, Path]:
         },
     )
 
-    env_cfg.commands["motion"] = terms.ClipLibraryCommandCfg(init=tables.init)
+    # mjlab and mjswan write the first tracked body's pose into the free joint, so that
+    # body leads: MyoFullBody's pelvis, upstream's first, sits in it, same origin, turned.
+    reference = (kin.info.root_name, *tracked[1:])
+    env_cfg.commands["motion"] = terms.MotionCommandCfg(
+        motion_file=str(clips[0].path),
+        anchor_body_name=reference[0],
+        body_names=reference,
+    )
     env_cfg.observations = {
         "latent": ObservationGroupCfg(
             terms={"latent": ObservationTermCfg(func=contract.latent)},
@@ -67,7 +75,7 @@ def play_env_cfg(body: upstream.Body, root: Path) -> tuple[Any, Path]:
     env_cfg.actions["muscles"] = terms.muscle_action(env_cfg.actions["muscles"])
     # Every reward reads upstream's motion command, and the browser computes none.
     env_cfg.rewards = {}
-    return env_cfg, onnx_path
+    return env_cfg, onnx_path, clips, kin.info.joint_names
 
 
 def setup_builder() -> mjswan.Builder:
@@ -78,11 +86,24 @@ def setup_builder() -> mjswan.Builder:
     # The checkpoints state no license.
     project = builder.add_project(name="SuperMimic")
     for name, body in SCENES.items():
-        env_cfg, onnx_path = play_env_cfg(body, root)
+        env_cfg, onnx_path, clips, joint_names = play_env_cfg(body, root)
         scene = project.add_scene_mjlab(body.task_id, name=name, env_cfg=env_cfg)
-        scene.add_policy(
+        policy = scene.add_policy(
             Path(body.checkpoint).stem,
             onnx.load(onnx_path),
             in_keys=["latent", "policy"],
         )
+        command = env_cfg.commands["motion"]
+        for clip in clips:
+            policy.add_motion(
+                name=clip.name,
+                source=str(clip.path),
+                fps=upstream.FPS,
+                anchor_body_name=command.anchor_body_name,
+                body_names=command.body_names,
+                dataset_joint_names=joint_names,
+                default=clip is clips[0],
+                frame_fields=upstream.FRAME_FIELDS,
+                group=clip.group,
+            )
     return builder

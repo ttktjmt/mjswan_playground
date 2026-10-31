@@ -503,19 +503,30 @@ PREVIEWS: dict[str, Preview | tuple[Preview, ...]] = {
             )
         ),
     ),
-    # One cut per body, from a reset into clip 4/WalkingStraightForward02 (524 steps).
-    # MS-Human-700's pelvis is y-up, as in OpenSim, so the tilt check reads it fallen;
-    # a fall still ends its episode through upstream's root_ori_dev.
+    # One cut per body: three clips picked in the motion picker, each from frame 0.
     "msm": tuple(
         Preview(
             scene=scene,
+            motions=motions,
             orbit=60,
             crop="680:497:140:120",
             from_reset=True,
-            seconds=5.0,
-            upright=scene != "ms_human_700",
+            seconds=6.0,
         )
-        for scene in ("ms_human_700", "myofullbody")
+        for scene, motions in (
+            (
+                "ms_human_700",
+                (
+                    "4/WalkingStraightForward02",
+                    "6/WalkingStraightBackwards02",
+                    "348/walking_run06",
+                ),
+            ),
+            (
+                "myofullbody",
+                ("317/turn_left03", "3/walk_with_support04", "348/walking_run02"),
+            ),
+        )
     ),
 }
 

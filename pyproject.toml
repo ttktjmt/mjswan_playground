@@ -7,7 +7,7 @@ license = { text = "Apache-2.0" }
 authors = [{ name = "mjswan Developers" }]
 # Inherited from mjswan: labmaze (transitive, via myosuite -> dm-control) has no
 # pre-built wheel for 3.13+.
-requires-python = ">=3.10, <3.13"
+requires-python = ">=3.11, <3.13"
 dependencies = [
     "mjswan>=0.12.3",
     "mjlab==1.6.0",
@@ -60,6 +60,8 @@ only-include = ["src"]
 # TERRA's code is only on feat/programmatic-waypoint-tasks; move to main once it merges.
 myosuite = { git = "https://github.com/MyoHub/myosuite", rev = "992bd58928e61d3f7ce27a033be02d0be18a2c18" }
 spinkick-example = { git = "https://github.com/mujocolab/g1_spinkick_example", rev = "f1c4b230bd1a76c44e801e49f079212b6c6487da" }
+# msm: frame_fields and grouped motions, ttktjmt/mjswan#191; drop once a release has them.
+mjswan = { git = "https://github.com/ttktjmt/mjswan", rev = "1ca686fc8b486cb35baedde42fa1f5787b2c3cf3" }
 
 [dependency-groups]
 dev = ["pytest>=9.0.2", "ruff==0.16.0"]
