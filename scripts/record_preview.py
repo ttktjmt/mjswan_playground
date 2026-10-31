@@ -81,8 +81,7 @@ SOFTWARE_CLOCK = 0.15
 #: that comes later.
 CHECK_SECONDS = 20.0
 #: A root tipped this far from upright has fallen, whatever the task's terminations say.
-#: Upright is the root's rest pose, `qpos0`: a model built y-up, as OpenSim's are, stands
-#: on a turned root.
+#: Upright is the root's rest pose, `qpos0`: a y-up model stands on a turned root.
 MAX_TILT_DEG = 75.0
 #: Share of control steps a traced observation, command or termination graph has to run
 #: on. Each runs every step; an input the browser cannot fill stops it, silently.
