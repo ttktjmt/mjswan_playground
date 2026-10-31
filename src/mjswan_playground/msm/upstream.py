@@ -90,7 +90,6 @@ def register_tasks(root: Path) -> None:
 class Tables:
     """Per frame of every clip, back to back, and per clip, as the port reads them."""
 
-    names: list[str]
     clip_start: np.ndarray
     clip_len: np.ndarray
     latent: np.ndarray
@@ -113,7 +112,6 @@ def ensure_policy(body: Body, root: Path, env_cfg: object) -> tuple[Path, Tables
         _convert(body, root, env_cfg, onnx_path, tables_path)
     with np.load(tables_path) as data:
         fields = {f.name: data[f.name] for f in dataclasses.fields(Tables)}
-    fields["names"] = [str(n) for n in fields["names"]]
     return onnx_path, Tables(**fields)
 
 
@@ -228,7 +226,6 @@ def _convert(
     init = np.fromfile(demo / meta["files"]["init"], "<f8")
     np.savez(
         tables_path,
-        names=np.array([c["name"] for c in meta["clips"]]),
         clip_start=motion.clip_start.numpy(),
         clip_len=motion.clip_len.numpy(),
         latent=latent.astype(np.float32),

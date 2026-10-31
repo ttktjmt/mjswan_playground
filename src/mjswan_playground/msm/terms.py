@@ -46,11 +46,10 @@ class ClipLibraryCommand(CommandTerm):
         self.robot = env.scene[cfg.entity_name]
         init = torch.as_tensor(cfg.init, dtype=torch.float32, device=self.device)
         nq = 7 + self.robot.num_joints
-        pose = init[:, :7]
+        self._root_pose = init[:, :7]
         # mjlab writes the root's angular velocity in the world frame; qvel holds it in
         # the root's own.
-        ang_vel = quat_apply(pose[:, 3:], init[:, nq + 3 : nq + 6])
-        self._root_pose = pose
+        ang_vel = quat_apply(self._root_pose[:, 3:], init[:, nq + 3 : nq + 6])
         self._root_vel = torch.cat([init[:, nq : nq + 3], ang_vel], -1)
         self._joint_pos = init[:, 7:nq]
         self._joint_vel = init[:, nq + 6 :]
@@ -63,9 +62,8 @@ class ClipLibraryCommand(CommandTerm):
         return self.clip
 
     def _resample_command(self, env_ids: torch.Tensor) -> None:
-        clip = torch.remainder(self.clip + 1.0, float(len(self._root_pose)))
-        self.clip = clip
-        index = clip[env_ids].long()
+        self.clip = torch.remainder(self.clip + 1.0, float(len(self._root_pose)))
+        index = self.clip[env_ids].long()
         self.robot.write_joint_state_to_sim(
             self._joint_pos[index], self._joint_vel[index], env_ids=env_ids
         )
@@ -143,7 +141,6 @@ def build_terms(
     act_adr = ids(model.actuator_actadr)
     bodies = ids([model.body(f"robot/{name}").id for name in tracked])
     body_root = ids(model.body_rootid[bodies.numpy()])
-    r_off = kin.R_off
 
     clip_start = torch.as_tensor(tables.clip_start, dtype=torch.long)
     last_clip = len(tables.clip_start) - 1
@@ -155,8 +152,7 @@ def build_terms(
 
     def frame(env: Any) -> tuple[torch.Tensor, torch.Tensor]:
         """The clip and the frame of it the step count has reached, held at the end."""
-        clip = env.command_manager.get_term("motion").clip.long()
-        clip = clip.clamp(0, last_clip)
+        clip = env.command_manager.get_term("motion").clip.long().clamp(0, last_clip)
         steps = env.episode_length_buf.long()
         return clip, clip_start[clip] + torch.minimum(steps, clip_len[clip] - 1)
 
@@ -250,7 +246,7 @@ def build_terms(
         return error > thresholds["root_pos_dev"]
 
     def root_ori_dev(env: Any) -> torch.Tensor:
-        canonical = root_rotation(env.sim.data) @ r_off
+        canonical = root_rotation(env.sim.data) @ kin.R_off
         return (
             rot_angle(ref_root_rot[frame(env)[1]], canonical)
             > thresholds["root_ori_dev"]

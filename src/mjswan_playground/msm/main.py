@@ -13,7 +13,7 @@ from mjlab.managers.termination_manager import TerminationTermCfg
 from mjlab.scene import Scene
 from mjlab.tasks.registry import load_env_cfg
 
-from . import upstream
+from . import terms, upstream
 
 #: Scene name -> the body it runs.
 SCENES = {"MS-Human-700": upstream.MS_HUMAN_700, "MyoFullBody": upstream.MYOFULLBODY}
@@ -22,8 +22,6 @@ SCENES = {"MS-Human-700": upstream.MS_HUMAN_700, "MyoFullBody": upstream.MYOFULL
 def play_env_cfg(body: upstream.Body, root: Path) -> tuple[Any, Path]:
     """The body's play config as the browser runs it, and its decoder."""
     from muscle_supermimic.tasks.tracking.mdp.kinematics import SkeletonKinematics
-
-    from . import terms
 
     env_cfg = load_env_cfg(body.task_id, play=True)
     onnx_path, tables = upstream.ensure_policy(body, root, env_cfg)
