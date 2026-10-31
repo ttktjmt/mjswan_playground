@@ -10,7 +10,8 @@ from typer.testing import CliRunner
 from mjswan_playground import _cli
 
 
-def _manifest(slots: list[dict]) -> dict:
+def _manifest(slots: list[dict], motions: tuple[list[str], ...] = ()) -> dict:
+    """One MDP reading `slots`, and a policy on it with a motion per `frame_fields`."""
     commands = {
         "clock": {
             "name": "OnnxCommand",
@@ -25,11 +26,14 @@ def _manifest(slots: list[dict]) -> dict:
         "commands": commands,
         "observations": {"actor": {"input_slots": slots}},
     }
-    return {"projects": [{"scenes": [{"id": "s", "mdps": [mdp]}]}]}
+    policy = {"mdp": "a0", "motions": [{"frame_fields": f} for f in motions]}
+    return {
+        "projects": [{"scenes": [{"id": "s", "mdps": [mdp], "policies": [policy]}]}]
+    }
 
 
-def _refused(*slots: tuple[str, str]) -> list[str]:
-    manifest = _manifest([{"command": c, "field": f} for c, f in slots])
+def _refused(*slots: tuple[str, str], motions: tuple[list[str], ...] = ()) -> list[str]:
+    manifest = _manifest([{"command": c, "field": f} for c, f in slots], motions)
     return _cli._unservable_command_slots(manifest)
 
 
@@ -51,6 +55,13 @@ def test_unserved_slots_are_refused() -> None:
         ("gone", "x"),
     ]:
         assert len(_refused(slot)) == 1, slot
+
+
+def test_frame_fields_every_motion_lists_are_served() -> None:
+    motions = (["latent"], ["latent", "phase"])
+    assert not _refused(("motion", "latent"), motions=motions)
+    assert len(_refused(("motion", "phase"), motions=motions)) == 1
+    assert len(_refused(("clock", "latent"), motions=motions)) == 1
 
 
 def _get_state_field(command: str) -> str:

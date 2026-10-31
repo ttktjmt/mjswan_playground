@@ -5,9 +5,9 @@ positions, velocities and muscle forces with torch forward kinematics and a torc
 of MuJoCo's tendons: thousands of graph nodes, too slow for a browser at 100 Hz, where
 MuJoCo computes the same every step. So the observation reads MuJoCo's muscle and body
 fields, on the simulated state rather than on upstream's, whose coupled joints sit
-exactly on their ``<equality>`` polynomials; the encoder's latent and the reference the
-terminations compare against are per-frame tables indexed by the clip and the step count;
-and :class:`ClipLibraryCommand` plays the clips in turn.
+exactly on their ``<equality>`` polynomials; and :class:`MotionCommand`, mjlab's, which
+mjswan runs as its own tracking command, serves each clip's reference and per-frame
+latent.
 """
 
 from __future__ import annotations
@@ -17,72 +17,82 @@ from typing import Any, Callable
 
 import numpy as np
 import torch
-from mjlab.managers.command_manager import CommandTerm, CommandTermCfg
+from mjlab.tasks.tracking import mdp
 from mjlab.utils.lab_api.math import quat_apply
-from mjswan import CommandBinding, register_command
+
+from .upstream import FRAME_FIELDS
 
 # A resampling time no episode reaches, so the clip changes on episode reset alone.
 _NEVER = 1.0e9
 
 
 @dataclass(kw_only=True)
-class ClipLibraryCommandCfg(CommandTermCfg):
-    """Each reset starts the next clip at its first frame."""
+class MotionCommandCfg(mdp.MotionCommandCfg):
+    """mjlab's tracking command, under the name mjswan runs as its own, serving each
+    clip's :data:`~.upstream.FRAME_FIELDS` too."""
 
-    init: np.ndarray
-    """``(clips, nq + nv)``: the robot's qpos and qvel at each clip's first frame."""
     entity_name: str = "robot"
+    joint_position_range: tuple[float, float] = (0.0, 0.0)
+    sampling_mode: str = "start"
     resampling_time_range: tuple[float, float] = (_NEVER, _NEVER)
 
-    def build(self, env: Any) -> ClipLibraryCommand:
-        return ClipLibraryCommand(self, env)
+    def build(self, env: Any) -> MotionCommand:
+        return MotionCommand(self, env)
 
 
-class ClipLibraryCommand(CommandTerm):
-    cfg: ClipLibraryCommandCfg
+class MotionCommand(mdp.MotionCommand):
+    cfg: MotionCommandCfg
 
-    def __init__(self, cfg: ClipLibraryCommandCfg, env: Any) -> None:
+    def __init__(self, cfg: MotionCommandCfg, env: Any) -> None:
         super().__init__(cfg, env)
-        self.robot = env.scene[cfg.entity_name]
-        init = torch.as_tensor(cfg.init, dtype=torch.float32, device=self.device)
-        nq = 7 + self.robot.num_joints
-        self._root_pose = init[:, :7]
-        # mjlab writes the root's angular velocity in the world frame; qvel holds it in
-        # the root's own.
-        ang_vel = quat_apply(self._root_pose[:, 3:], init[:, nq + 3 : nq + 6])
-        self._root_vel = torch.cat([init[:, nq : nq + 3], ang_vel], -1)
-        self._joint_pos = init[:, 7:nq]
-        self._joint_vel = init[:, nq + 6 :]
-        # A float: the browser feeds a command's state to graphs as float32. The first
-        # reset moves it to clip 0.
-        self.clip = torch.full((self.num_envs,), -1.0, device=self.device)
+        with np.load(cfg.motion_file) as clip:
+            self._latent, self._frames_left = (
+                torch.as_tensor(clip[name], device=self.device) for name in FRAME_FIELDS
+            )
+        self._held = torch.zeros(self.num_envs, dtype=torch.bool, device=self.device)
 
     @property
-    def command(self) -> torch.Tensor:
-        return self.clip
+    def latent(self) -> torch.Tensor:
+        return self._latent[self.time_steps]
 
-    def _resample_command(self, env_ids: torch.Tensor) -> None:
-        self.clip = torch.remainder(self.clip + 1.0, float(len(self._root_pose)))
-        index = self.clip[env_ids].long()
-        self.robot.write_joint_state_to_sim(
-            self._joint_pos[index], self._joint_vel[index], env_ids=env_ids
-        )
-        self.robot.write_root_link_pose_to_sim(self._root_pose[index], env_ids=env_ids)
-        self.robot.write_root_link_velocity_to_sim(
-            self._root_vel[index], env_ids=env_ids
-        )
+    @property
+    def frames_left(self) -> torch.Tensor:
+        return self._frames_left[self.time_steps]
+
+    def reset(self, env_ids: torch.Tensor) -> dict[str, float]:
+        extras = super().reset(env_ids)
+        self._held[env_ids] = True
+        return extras
 
     def _update_command(self, env_ids: torch.Tensor | None = None) -> None:
-        del env_ids
+        # Hold the frame a reset wrote through the next update, as upstream's command and
+        # mjswan's do; mjlab's steps past it.
+        ids = slice(None) if env_ids is None else env_ids
+        self.time_steps[ids] -= self._held[ids].long()
+        self._held[ids] = False
+        super()._update_command(env_ids)
 
-    def _update_metrics(self) -> None:
-        pass
-
-
-register_command(
-    "ClipLibraryCommandCfg",
-    CommandBinding(state_fields=["clip"], command_field="clip"),
-)
+    def _write_reference_state_to_sim(
+        self,
+        env_ids: torch.Tensor,
+        root_pos: torch.Tensor,
+        root_ori: torch.Tensor,
+        root_lin_vel: torch.Tensor,
+        root_ang_vel: torch.Tensor,
+        joint_pos: torch.Tensor,
+        joint_vel: torch.Tensor,
+    ) -> None:
+        """mjlab's, written as mjswan writes it: the joints unclipped, as upstream's reset
+        leaves a coupled joint up to 1e-4 rad past its range on its ``<equality>``
+        polynomial, and the root's angular velocity, in the root's frame at the first
+        frame (see the ponytail in `upstream`), straight into qvel."""
+        self.robot.write_joint_state_to_sim(joint_pos, joint_vel, env_ids=env_ids)
+        root_ang_vel = quat_apply(root_ori, root_ang_vel)
+        self.robot.write_root_state_to_sim(
+            torch.cat([root_pos, root_ori, root_lin_vel, root_ang_vel], -1),
+            env_ids=env_ids,
+        )
+        self.robot.reset(env_ids=env_ids)
 
 
 def muscle_action(term: Any) -> Any:
@@ -113,7 +123,6 @@ class Terms:
 def build_terms(
     model: Any,
     kin: Any,
-    tables: Any,
     *,
     tracked: tuple[str, ...],
     touch: str,
@@ -122,9 +131,9 @@ def build_terms(
     """The terms for one body.
 
     ``model`` is the scene as compiled, ``kin`` upstream's ``SkeletonKinematics`` of the
-    robot, ``tables`` the clip tables of :func:`upstream.ensure_policy`, ``tracked`` the
-    command's tracked bodies, ``touch`` the foot contact sensor, which keeps one substep
-    of history, and ``thresholds`` upstream's for each deviation termination.
+    robot, ``tracked`` upstream's tracked bodies, ``touch`` the foot contact sensor, which
+    keeps one substep of history, and ``thresholds`` upstream's for each deviation
+    termination.
     """
     from muscle_supermimic.tasks.tracking.mdp.heads import rel_sites, rot_angle
     from muscle_supermimic.utils.rotations import mat_to_quat, quat_to_mat
@@ -142,19 +151,8 @@ def build_terms(
     bodies = ids([model.body(f"robot/{name}").id for name in tracked])
     body_root = ids(model.body_rootid[bodies.numpy()])
 
-    clip_start = torch.as_tensor(tables.clip_start, dtype=torch.long)
-    last_clip = len(tables.clip_start) - 1
-    clip_len = torch.as_tensor(tables.clip_len, dtype=torch.long)
-    latent = torch.as_tensor(tables.latent)
-    ref_root_pos = torch.as_tensor(tables.root_pos, dtype=torch.float32)
-    ref_root_rot = torch.as_tensor(tables.root_rot, dtype=torch.float32)
-    ref_body_rpos = torch.as_tensor(tables.body_rpos, dtype=torch.float32)
-
-    def frame(env: Any) -> tuple[torch.Tensor, torch.Tensor]:
-        """The clip and the frame of it the step count has reached, held at the end."""
-        clip = env.command_manager.get_term("motion").clip.long().clamp(0, last_clip)
-        steps = env.episode_length_buf.long()
-        return clip, clip_start[clip] + torch.minimum(steps, clip_len[clip] - 1)
+    def command(env: Any) -> Any:
+        return env.command_manager.get_term("motion")
 
     def root_rotation(data: Any) -> torch.Tensor:
         return quat_to_mat(data.qpos[:, free_q[3:]])
@@ -228,33 +226,31 @@ def build_terms(
     def site_rvel(env: Any) -> torch.Tensor:
         return sites(env.sim.data)[2].flatten(1)
 
-    def latent_term(env: Any) -> torch.Tensor:
-        return latent[frame(env)[1]]
+    def latent(env: Any) -> torch.Tensor:
+        return command(env).latent
 
-    # Upstream compares the state after a step with the frame after the observed one,
-    # which the step count has reached by then.
+    # Upstream compares the state after a step with the frame after the observed one;
+    # the command serves the observed one until its update, after the terminations.
     def body_pos_dev(env: Any) -> torch.Tensor:
-        rpos = sites(env.sim.data)[0]
+        ref = command(env).body_pos_w
+        pos = env.sim.data.xpos[:, bodies]
         deviation = torch.linalg.vector_norm(
-            ref_body_rpos[frame(env)[1]] - rpos, dim=-1
+            (ref[:, 1:] - ref[:, :1]) - (pos[:, 1:] - pos[:, :1]), dim=-1
         )
         return deviation.mean(-1) > thresholds["body_pos_dev"]
 
     def root_pos_dev(env: Any) -> torch.Tensor:
         position = env.sim.data.qpos[:, free_q[:3]]
-        error = torch.linalg.vector_norm(ref_root_pos[frame(env)[1]] - position, dim=-1)
+        error = torch.linalg.vector_norm(command(env).anchor_pos_w - position, dim=-1)
         return error > thresholds["root_pos_dev"]
 
     def root_ori_dev(env: Any) -> torch.Tensor:
-        canonical = root_rotation(env.sim.data) @ kin.R_off
-        return (
-            rot_angle(ref_root_rot[frame(env)[1]], canonical)
-            > thresholds["root_ori_dev"]
-        )
+        ref = quat_to_mat(command(env).anchor_quat_w)
+        return rot_angle(ref, root_rotation(env.sim.data)) > thresholds["root_ori_dev"]
 
     def motion_end(env: Any) -> torch.Tensor:
-        clip, _ = frame(env)
-        return env.episode_length_buf.long() >= clip_len[clip] - 1
+        """The step reached the clip's last frame."""
+        return command(env).frames_left[:, 0] <= 1
 
     return Terms(
         observations={
@@ -272,7 +268,7 @@ def build_terms(
             "site_rangles": site_rangles,
             "site_rvel": site_rvel,
         },
-        latent=latent_term,
+        latent=latent,
         terminations={
             "motion_end": motion_end,
             "body_pos_dev": body_pos_dev,

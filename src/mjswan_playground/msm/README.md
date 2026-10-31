@@ -16,9 +16,11 @@ project page: https://muscle-supermimic.beanpow.top/
 > CoRL 2026. arXiv:2610.28480.
 
 Two whole-body musculoskeletal humans, each driven by its own SuperMimic policy, setting
-the excitation of every muscle at 100 Hz to track motion-capture clips: walking forward,
-backward, slow, fast and running, turning, circling, and walking with support. Each reset
-starts the next of the 32 clips upstream's own browser demo plays, from its first frame.
+the excitation of every muscle at 100 Hz to track motion-capture clips. The viewer's
+motion picker lists the 32 clips of upstream's own browser demo under its groups: walking
+forward, backward, slowly, at a medium pace and fast, running, turning left and right,
+circling either way, and walking with a support. A clip plays from its first frame, in
+the state upstream's reset writes, and starts over after its last.
 
 | Scene | Body | Policy |
 |---|---|---|
@@ -35,7 +37,9 @@ uv run msp run msm
 The first build clones muscle-supermimic and its MS-Human-700 submodule into
 `.cache/msm/` at pinned commits (or reads the checkouts `MJSWAN_MSM_ROOT` and
 `MS_HUMAN_700_ROOT` point at), downloads both checkpoints from the Hub at a pinned
-revision (322 MB and 258 MB), and caches what each policy needs beside them.
+revision (322 MB and 258 MB), and converts each policy's decoder and each clip beside
+them. The clips take 63 MB and 66 MB of the build; the browser fetches one when it is
+picked.
 
 | Policy | Upstream task | Checkpoint |
 |---|---|---|
@@ -45,9 +49,10 @@ revision (322 MB and 258 MB), and caches what each policy needs beside them.
 | From `muscle-supermimic` | Used as |
 |---|---|
 | `src/muscle_supermimic/` | the tasks' play configs and bodies, the motion library, the kinematics and the policy network, imported from the checkout |
-| `docs/website/demo/data/<body>/clips/` | each clip's reference qpos per frame, rebuilt into the motion library's trajectory format |
-| `docs/website/demo/data/<body>/init.bin` | the state upstream's reset writes at each clip's first frame |
+| `docs/website/demo/data/<body>/clips/` | each clip's reference qpos per frame, rebuilt into an mjlab motion |
+| `docs/website/demo/data/<body>/init.bin` | the state upstream's reset writes, each motion's first frame |
 | `docs/website/demo/data/<body>/policy.onnx.gz` | the decoder upstream exported, which the export here is checked against |
+| `docs/website/demo/main.mjs` | the picker's groups, its `KINDS` |
 | `src/muscle_supermimic/tasks/tracking/scripts/export_web.py` | the decoder's export, weight matrices stored as float16 |
 
 Left out: `Mjlab-SuperMimic-Flat-MS-Human-700`, the body with free hands, which has no
@@ -63,9 +68,14 @@ as upstream's demo does, the build evaluates it once for every frame of the clip
 per body) and the browser runs the decoder alone: `latent[1, 32]` and `policy[1, N]` to
 the excitations, with N 3819 on MS-Human-700 and 2141 on MyoFullBody.
 
+Each clip is an mjlab motion `.npz`: mjlab's arrays, every body's pose and velocity per
+frame as `csv_to_npz` records them, and two more, a row per frame, that mjswan's tracking
+command serves at the current frame. `latent` is the encoder's; `frames_left` counts the
+frames after the current one, for upstream's `motion_end`.
+
 | Term | Width | Source |
 |---|---:|---|
-| `latent` | 32 | the encoder's latent, a table indexed by the clip and the step count |
+| `latent` | 32 | the selected clip's `latent` at the current frame |
 | `root_pos`, `root_vel` | 5, 6 | the free joint's `qpos` (height, quaternion) and `qvel` |
 | `joint_pos`, `joint_vel` | 71 or 82 each | every joint, the coupled ones on their `<equality>` polynomials, upstream's own code |
 | `muscle_length`, `_velocity`, `_force` | 3 per muscle | `actuator_length`, `actuator_velocity`, `actuator_force` |
@@ -76,17 +86,23 @@ the excitations, with N 3819 on MS-Human-700 and 2141 on MyoFullBody.
 | Compared | MS-Human-700 | MyoFullBody |
 |---|---:|---:|
 | latents vs upstream's demo, 18150 frames | 8.9e-05 | 4.5e-05 |
-| decoder vs upstream's exported one, 16 rows | 1.5e-06 | 2.1e-06 |
+| decoder vs upstream's exported one, 16 rows | 1.4e-06 | 2.1e-06 |
+| the clips' tracked bodies vs upstream's kinematics (m) | 7.2e-07 | 7.2e-07 |
+| a reset's state vs upstream's (`init.bin`), 32 clips: in mjlab, qpos / qvel | 6.0e-08 / 7.5e-08 | 1.2e-07 / 6.0e-08 |
+| same, as mjswan's tracking command writes it | 6.0e-08 / 0 | 6.0e-08 / 0 |
+| the latent the policy sees each step vs the demo's for that frame, 32 clips | 8.9e-05 | 4.5e-05 |
 | observation vs upstream's, on its own play rollouts: muscle length (m) | 3.3e-02 | 5.0e-02 |
 | same: muscle velocity (m/s) / force (N) | 9.4e-02 / 482 | 0.18 / 695 |
 | same: tracked-body positions (m) / angles (rad) / velocities | 1.0e-02 / 5.1e-03 / 0.10 | 3.4e-03 / 1.2e-02 / 0.30 |
-| same: every other term, the latent included | 1.2e-06 | 1.3e-06 |
-| traced graphs vs these terms in mjlab, 16 steps (`scripts/parity.py msm`) | 4.8e-07 | 9.5e-07 |
+| same: every other term | 1.2e-06 | 1.3e-06 |
+| traced graphs vs these terms in mjlab, 16 steps (`scripts/parity.py msm`) | 4.6e-07 | 4.6e-07 |
 
 The rollouts are two clips per body played to their end by upstream's own env and
 policy: MS-Human-700's first and its counterclockwise circle, MyoFullBody's first and a
-run. Fed this observation instead, the policies track every clip tried, in mjlab and in
-the browser, to its last frame.
+run. Fed this observation instead, the policies track all 32 clips to their last frame in
+mjlab, each episode ended by `motion_end` after as many steps as upstream's. The latent
+check runs those episodes: the latent is the clip's own row at the step count, and the
+rows next to it differ from it by at least 7.9e-04.
 
 ## What differs from upstream
 
@@ -98,16 +114,34 @@ the browser, to its last frame.
   above has the difference; the joint positions and velocities are upstream's own.
 - **The clips are upstream demo's.** MuscleMimic's retargeted clips are a gated dataset,
   so the build rebuilds the 32 held-out KIT clips of upstream's browser demo, three of
-  each kind, from the reference poses in its files, and checks the latents it evaluates
-  against the ones the demo ships.
-- **`ClipLibraryCommand` replaces upstream's `MotionCommand`.** Upstream's play config
-  starts every episode at a clip's first frame, always the first clip for its one env;
-  here each reset plays the next clip, writing the state upstream's reset writes. The
-  latent and the reference the terminations compare against are tables indexed by the
-  clip and the step count, as upstream's frame advances one per step.
-- **The terminations are upstream's four**, the clip's last frame as a time-out and the
-  mean tracked-body, root position and root orientation deviations past 1, the bodies
-  read off MuJoCo as above.
+  each kind, from the reference poses in its files. Each becomes an mjlab motion, replayed
+  in MuJoCo as mjlab's `csv_to_npz` replays a clip, with upstream's reference velocities
+  and, at its first frame, the state upstream's reset writes. The build checks the
+  latents it evaluates against the demo's, and the tracked bodies against upstream's
+  kinematics.
+- **mjlab's `MotionCommand` replaces upstream's**, and mjswan runs it as its own tracking
+  command, the viewer picking the clip; upstream's play config replays the first.
+  - Like upstream's, and unlike mjlab's own, it keeps the frame a reset writes through
+    the step the reset lands in, so the policy sees frame n at step n, and it writes the
+    joints unclipped: upstream's reset leaves a coupled joint up to 1e-4 rad past its
+    range, on its polynomial.
+  - The latent and the clip's end come from the clip's `latent` and `frames_left`.
+  - The terminations are upstream's four: the clip's last frame as a time-out, and the
+    mean tracked-body, root position and root orientation deviations past 1 m or 1 rad.
+    The deviations read the reference the command serves, the root's pose and the
+    tracked bodies' positions, at the frame the policy observed: the command moves on
+    after the terminations run, where upstream compares with the next frame, 10 ms on.
+  - On MyoFullBody it tracks the free joint's body, `Full Body`, in place of upstream's
+    first, the pelvis inside it: the same origin, turned. mjlab and mjswan write the first
+    tracked body's pose into the free joint.
+  - Each clip's first frame holds the root's angular velocity in the root's own frame,
+    since mjswan writes it into the free joint's velocity unrotated, where mjlab rotates
+    it out of the world's; the command here writes it the same way. Both resets are then
+    upstream's.
+- **In the browser, a clip picked or reset in the viewer runs a step behind.** mjswan's
+  tracking command keeps a reset's frame for one more step when the reset comes between
+  steps, so that episode sees each latent one control step late, and lasts a step longer.
+  The episodes after it, which `motion_end` starts, match upstream's frame for frame.
 - **The muscle action runs as mjswan's.** Upstream's `MuscleExcitationAction` writes each
   excitation, clipped to [0, 1], to its muscle's `ctrl` through the tendon's effort
   target, which mjswan does not run; under the name of mjswan's muscle action, which in
@@ -127,6 +161,6 @@ The code is Apache-2.0, and MS-Human-700 and `musclemimic-models` are too, but:
 - The clips are AMASS KIT motions, whose license allows non-commercial research only and
   no redistribution, retargeted to MyoFullBody by MuscleMimic and from there onto
   MS-Human-700 by upstream. The build bakes the latents and reference poses of 32 of them
-  into its graphs.
+  into its motions.
 
 So the task stays off this repository's site, and only its author publishes it.
