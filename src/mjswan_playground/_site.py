@@ -17,6 +17,8 @@ SIZE_WARNING = 800_000_000
 NOT_ON_SITE = {
     "musclemimic": "its walking clip comes from a gated Hugging Face dataset, and the "
     "deploy workflow has no Hub login",
+    "msm": "its clips are AMASS motions, whose license forbids redistribution, and "
+    "MyoFullBody's arm and hand are non-commercial: its author publishes it",
 }
 
 _ROW = re.compile(

@@ -1625,6 +1625,10 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+msm = [
+    { name = "musclemimic-models" },
+    { name = "onnxruntime" },
+]
 musclemimic = [
     { name = "myosuite", extra = ["musclemimic"] },
     { name = "orbax-checkpoint", version = "0.11.39", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -1660,9 +1664,11 @@ previews = [
 requires-dist = [
     { name = "mjlab", specifier = "==1.6.0" },
     { name = "mjswan", specifier = ">=0.12.3" },
+    { name = "musclemimic-models", marker = "extra == 'msm'", specifier = "==1.0.6" },
     { name = "myosuite", extras = ["musclemimic"], marker = "extra == 'musclemimic'", git = "https://github.com/MyoHub/myosuite?rev=992bd58928e61d3f7ce27a033be02d0be18a2c18" },
     { name = "myosuite", extras = ["musclemimic"], marker = "extra == 'terra'", git = "https://github.com/MyoHub/myosuite?rev=992bd58928e61d3f7ce27a033be02d0be18a2c18" },
     { name = "onnx", specifier = ">=1.20.0" },
+    { name = "onnxruntime", marker = "extra == 'msm'" },
     { name = "onnxruntime", marker = "extra == 'orcs'" },
     { name = "orbax-checkpoint", marker = "extra == 'musclemimic'", specifier = ">=0.11" },
     { name = "orbax-checkpoint", marker = "extra == 'terra'", specifier = ">=0.11" },
@@ -1673,7 +1679,7 @@ requires-dist = [
     { name = "usd-core", marker = "extra == 'orcs'", specifier = ">=26.8" },
     { name = "wbc-mjlab", marker = "extra == 'wbc'", specifier = ">=0.0.6" },
 ]
-provides-extras = ["wbc", "musclemimic", "orcs", "spinkick", "terra"]
+provides-extras = ["wbc", "musclemimic", "orcs", "msm", "spinkick", "terra"]
 
 [package.metadata.requires-dev]
 dev = [
