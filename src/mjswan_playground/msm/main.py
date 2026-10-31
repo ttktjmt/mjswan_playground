@@ -29,7 +29,7 @@ def play_env_cfg(body: upstream.Body, root: Path) -> tuple[Any, Path]:
     onnx_path, tables = upstream.ensure_policy(body, root, env_cfg)
     command = env_cfg.commands["motion"]
     (sensor,) = env_cfg.scene.sensors
-    # The last substep's reading, which the touch observation reads (`terms`).
+    # Keeps the last substep's reading, which the touch observation reads (`terms`).
     sensor.history_length = 1
     contract = terms.build_terms(
         Scene(env_cfg.scene, device="cpu").spec.compile(),
