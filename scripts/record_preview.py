@@ -81,6 +81,7 @@ SOFTWARE_CLOCK = 0.15
 #: that comes later.
 CHECK_SECONDS = 20.0
 #: A root tipped this far from upright has fallen, whatever the task's terminations say.
+#: Upright is the root's rest pose, `qpos0`: a y-up model stands on a turned root.
 MAX_TILT_DEG = 75.0
 #: Share of control steps a traced observation, command or termination graph has to run
 #: on. Each runs every step; an input the browser cannot fill stops it, silently.
@@ -108,9 +109,10 @@ class Preview:
             is the range of motions rather than any single one. Empty films one segment
             of whatever `steps` left running.
         query: Extra URL query, e.g. ``"ref=0"`` to drop the motion-tracking ghost.
-        from_reset: Press `r` just before rolling, so the clip runs from one reset. With
-            `seconds` at the episode length the GIF then loops on the reset rather than
-            cutting across it mid-clip.
+        from_reset: Press `r` just before rolling, so the clip runs from one reset. The
+            first frame lands a few control steps after it, about ten with `--software`:
+            with `seconds` that much under the episode length the GIF then loops on the
+            reset rather than cutting across it mid-clip.
         tilt: Degrees to drop the camera towards the horizon, same drag. Positive lowers
             it; the authored cameras look down from well above head height.
         orbit: Degrees to swing the camera, as a drag on empty background would. Positive
@@ -705,12 +707,17 @@ _TELEMETRY = """(() => {
         }
         return adr;
     };
+    // The world's up in the frame of the free joint at `adr`.
+    const upIn = (qpos, adr) => {
+        const [w, x, y, z] = qpos.slice(adr + 3, adr + 7);
+        return [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)];
+    };
     window.__recHook = (rt) => {
         if (rt.__rec) return;
         rt.__rec = rec.hooked = true;
         rec.rt = rt;
         rec.paths = () => [...(rt.policyGraphs?.sessions?.keys() ?? [])];
-        let obs = null, model = null, root = null, last = null;
+        let obs = null, model = null, root = null, up = null, last = null;
         // Loading a policy builds new sessions and a new termination manager.
         const watch = () => {
             for (const [path, session] of rt.policyGraphs?.sessions ?? []) {
@@ -743,7 +750,10 @@ _TELEMETRY = """(() => {
             step();
             const m = rt.mjModel, d = rt.mjData;
             if (!m || !d) return;
-            if (m !== model) [model, root] = [m, rootOf(m)];
+            if (m !== model) {
+                [model, root] = [m, rootOf(m)];
+                if (root !== null) up = upIn(m.qpos0, root);
+            }
             const s = { nan: null, zero: [], same: null };
             if (!finite(d.qpos) || !finite(d.qvel)) s.nan = "state";
             for (const [key, v] of Object.entries(obs ?? {})) {
@@ -757,9 +767,9 @@ _TELEMETRY = """(() => {
                 last = Float32Array.from(act);
             }
             if (root !== null) {
-                const q = d.qpos, x = q[root + 4], y = q[root + 5];
-                s.z = q[root + 2];
-                s.tilt = (Math.acos(Math.max(-1, Math.min(1, 1 - 2 * (x * x + y * y)))) * 180) / Math.PI;
+                const u = upIn(d.qpos, root), c = u[0] * up[0] + u[1] * up[1] + u[2] * up[2];
+                s.z = d.qpos[root + 2];
+                s.tilt = (Math.acos(Math.max(-1, Math.min(1, c))) * 180) / Math.PI;
             }
             rec.steps.push(s);
         };
