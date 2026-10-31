@@ -28,6 +28,9 @@ musclemimic = [
 ]
 # Checks the policies the orcs task converts, and reads GRAIL's curbs when it stages them.
 orcs = ["onnxruntime", "usd-core>=26.8"]
+# MyoFullBody's model for the msm task, which runs muscle-supermimic from a checkout;
+# onnxruntime checks the policies it converts against upstream's own.
+msm = ["musclemimic-models==1.0.6", "onnxruntime"]
 spinkick = ["spinkick-example"]
 # Registers myosuite's waypoint task and TERRA's helpers, and reads the TERRA-4B Orbax
 # checkpoint; only the terra task needs it.
