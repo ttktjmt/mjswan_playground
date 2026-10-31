@@ -501,11 +501,9 @@ PREVIEWS: dict[str, Preview | tuple[Preview, ...]] = {
             )
         ),
     ),
-    # One cut per body: `r` starts the next clip of the library from its first frame,
-    # 4/WalkingStraightForward02, whose 524 steps end just after the 5 s filmed. The
-    # tilt check reads the root body's z axis, which on MS-Human-700's pelvis (OpenSim's
-    # frame, y up) lies level when upright; a fall still ends its episode through
-    # upstream's root_ori_dev, which the check fails on.
+    # One cut per body, from a reset into clip 4/WalkingStraightForward02 (524 steps).
+    # MS-Human-700's pelvis is y-up, as in OpenSim, so the tilt check reads it fallen;
+    # a fall still ends its episode through upstream's root_ori_dev.
     "msm": tuple(
         Preview(
             scene=scene,
