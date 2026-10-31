@@ -20,43 +20,6 @@
 # An entry with a single `task` and `policy` still waits for part A to list its
 # repository's simulations.
 
-- id: msm
-  repo: https://github.com/kaibohex/muscle-supermimic
-  commit: d73bbcb866da83bef186a730547ab09ecb96bd3d
-  simulations:
-    - task: Mjlab-SuperMimic-Flat-MS-Human-700-Locked-Hands (src/muscle_supermimic/tasks/tracking/config/mshuman700), MS-Human-700 with locked hands (33 joint DoF, 694 muscles) tracking KIT clips retargeted from MuscleMimic's MyoFullBody clips
-      policy: 'Hugging Face Beanpow/muscle-supermimic at d3fdd54eedea09411f5c9750ff59a61996febc9f, mshuman700/kit_mm_euler_sgc100/model_016000.pt (iteration 16000, the one upstream''s browser demo runs; a motion encoder over the reference-only goal and a decoder over the 2,000-odd-wide state observation, sigmoid excitations); clips from upstream''s own docs/website/demo/data/mshuman700 at the pinned commit (32 held-out KIT clips: per frame the encoder''s 32-dim latent and the reference qpos at 100 Hz, init.bin the reset state), the list in data/mshuman700_kit/demo_clips.txt'
-      ease: '2: several task-specific rewrites: the MotionCommand (MotionLib, analytic TrackingHeads) recast so the observation reads sim fields (qpos, qvel, actuator length, velocity and force, ctrl, act, foot contact force, tracked bodies relative to the pelvis) and the goal''s latent comes from a per-frame table, as upstream''s export_web.py and tracker.mjs do; the TendonEffortAction subclass resolves muscle targets by name; 500 Hz physics and 100 Hz control, which upstream''s own WASM demo keeps up with'
-    - task: 'Mjlab-SuperMimic-Flat-MyoFullBody (src/muscle_supermimic/tasks/tracking/config/myofullbody), MuscleMimic''s MyoFullBody (musclemimic-models 1.0.6, fingers disabled, 31 joint DoF and 354 muscles) tracking MuscleMimic''s retargeted KIT clips'
-      policy: 'the same Hub revision, myofullbody/kit_n4096_euler_sgc100/model_016000.pt (iteration 16000, the demo''s); clips from docs/website/demo/data/myofullbody at the pinned commit (the same 32 clips, frame width 121: latent 32 + qpos 89), the list in data/musclemimic/demo_clips.txt'
-      ease: '2: as MS-Human-700'
-  left_out: >-
-    Mjlab-SuperMimic-Flat-MS-Human-700 (free hands, 700 muscles): no checkpoint. The
-    model_010000.pt files: earlier checkpoints of the same two runs.
-    myofullbody/kit_n4096_euler/model_012000.pt: an earlier run of the same MyoFullBody task,
-    which the card says collapsed after it; the same simulation.
-  license: 'Apache-2.0 for the code (LICENSE, with NOTICE for the MIT supermimic_vibed port); the Hub checkpoints state no license (the card calls them private while the repository is public); MS-Human-700 Apache-2.0 (LNSGroup/MS-Human-700 at 2d686957aefd5739cf4d2859a6acfd94c8f84400, the submodule); MyoFullBody from musclemimic-models 1.0.6 (Apache-2.0), whose arm and hand derive from MoBL-ARMS, non-commercial only; the clips are AMASS (KIT) retargets, AMASS''s license: non-commercial research, no redistribution'
-  popularity: '0: 36 stars (2026-10-31), created 2026-10; the method is SuperMimic (CoRL 2026, arXiv 2610.28480)'
-  ease: '2: both bodies need the command recast and a per-frame latent table'
-  notes: >-
-    SuperMimic's world-model tracking policies on two musculoskeletal bodies, on mjlab
-    1.6.0 (the playground's) with musclemimic-models==1.0.6, which the musclemimic task
-    pins at 1.0.5 through myosuite: check they co-resolve, else fetch the MyoFullBody XML
-    some other pinned way. Registers through the mjlab.tasks entry point. MS-Human-700 is a
-    git submodule with an ssh URL: fetch https://github.com/LNSGroup/MS-Human-700 at the
-    submodule's commit and point MS_HUMAN_700_ROOT at it. Upstream already runs both
-    checkpoints in a browser (docs/website/demo: export_web.py's Decoder takes the
-    precomputed latent z and the observation, with the normalization and the sigmoid;
-    tracker.mjs recomputes the observation from MuJoCo fields; web/test/align.mjs checks
-    it): follow it for the observation layout and the latent table. The gated
-    amathislab/musclemimic-retargeted dataset needs a Hub login this environment lacks, so
-    take the clips from the demo's files in git. 2 ms Euler, 100 solver / 50 line-search
-    iterations, decimation 5; play starts each clip at its first frame with auto-reset.
-    Since the clips' terms forbid redistribution, keep the task off the site
-    (NOT_ON_SITE) and leave publishing to the owner.
-  found: '2026-10-31: the owner named it'
-  pinned: '2026-10-31: the owner asked for it in today''s run, ahead of the rest, skipping the scout'
-
 - id: sonic
   repo: https://github.com/bethalageetachandraraju/sonic_4_-mjlab
   commit: c649dac4044277f91c9e3c5f8b41b3acc7a94ffb
