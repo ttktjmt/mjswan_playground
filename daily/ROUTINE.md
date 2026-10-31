@@ -33,13 +33,13 @@ Until a person merges that PR, the backlog for part D is the one on its branch.
 For each open pull request labelled `needs-mjswan`, which links one ttktjmt/mjswan pull request:
 
 - The mjswan PR closed without merging: close the task's PR with a comment saying so, and open a `daily-task-skipped` issue for its id.
-- The mjswan PR has new commits: move the pin to its new head, `uv lock --upgrade-package mjswan`, build, rerun parity and push. The PR stays a draft.
+- The mjswan PR has new commits: move the pin to its new head, `uv lock --upgrade-package mjswan` (with a recent uv, as msp:add-new-task step 2 says), build, rerun parity and push. The PR stays a draft.
 - `main` locks an mjswan release that contains the mjswan PR's merge commit: finish the task as step 9 of msp:add-new-task says.
 - Anything else: leave it.
 
 ## C. mjswan release bump
 
-PyPI has a stable mjswan newer than the one `main` locks, and no open PR is labelled `mjswan-bump`: on `claude/mjswan-bump-<version>`, raise the floor in `pyproject.toml` (and the `mjlab` pin if mjswan's `mjlab` extra moved), `uv lock`, build every task, run `make test`, check every task's run with `scripts/record_preview.py --all --out-dir` a scratch directory (msp:add-new-task step 7 has the cloud flags), and open the PR labelled `mjswan-bump` with each task's check result.
+PyPI has a stable mjswan newer than the one `main` locks, and no open PR is labelled `mjswan-bump`: on `claude/mjswan-bump-<version>`, raise the floor in `pyproject.toml` (and the `mjlab` pin if mjswan's `mjlab` extra moved), `uv lock` (with a recent uv, as msp:add-new-task step 2 says), build every task, run `make test`, check every task's run with `scripts/record_preview.py --all --out-dir` a scratch directory (msp:add-new-task step 7 has the cloud flags), and open the PR labelled `mjswan-bump` with each task's check result.
 
 ## D. One new task, with every simulation in it
 
@@ -74,7 +74,7 @@ Keep each branch's findings, applied or left, and its `net:` line for the report
 Before the report, check every result of this run against GitHub and the files, never against memory. Fix what is off and check it again: a result is done only once its check passes. A fix made here goes through part F's review before it counts, and a fix to the routine itself goes on part E's branch. One that cannot be fixed this run leads the report as a failure, with what is wrong.
 
 - Every branch this run pushed: its remote head is the local commit, and the working tree is clean.
-- Every pull request this run opened or updated: it targets `main` and carries its labels (`daily-backlog`, `daily-routine`, `daily-task`, `mjswan-bump`, or `needs-mjswan` on a draft). Its checks have finished green on its current head: wait for them, up to 30 minutes. Root-cause a red check, fix it, push and wait again; one that is red on `main` too is noted, not fixed here. A `needs-mjswan` draft's `released-mjswan` check is red by design.
+- Every pull request this run opened or updated: it targets `main` and carries its labels (`daily-backlog`, `daily-routine`, `daily-task`, `mjswan-bump`, or `needs-mjswan` on a draft). Its checks have finished green on its current head: wait for them, up to 30 minutes, reading them as msp:add-new-task step 11 says. Root-cause a red check, fix it, push and wait again; one that is red on `main` too is noted, not fixed here. A `needs-mjswan` draft's `released-mjswan` check is red by design.
 - The pull request of a task this run added or finished holds the whole task:
   - `src/mjswan_playground/<id>/`, with a README that opens with the GIF;
   - a scene for each simulation in its backlog entry, unless the pull request names it as left out, with why;
