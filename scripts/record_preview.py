@@ -708,9 +708,9 @@ _TELEMETRY = """(() => {
         }
         return adr;
     };
-    // The world's up in the root's frame at rest.
-    const restUp = (m, adr) => {
-        const [w, x, y, z] = m.qpos0.slice(adr + 3, adr + 7);
+    // The world's up in the frame of the free joint at `adr`.
+    const upIn = (qpos, adr) => {
+        const [w, x, y, z] = qpos.slice(adr + 3, adr + 7);
         return [2 * (x * z - w * y), 2 * (y * z + w * x), 1 - 2 * (x * x + y * y)];
     };
     window.__recHook = (rt) => {
@@ -753,7 +753,7 @@ _TELEMETRY = """(() => {
             if (!m || !d) return;
             if (m !== model) {
                 [model, root] = [m, rootOf(m)];
-                if (root !== null) up = restUp(m, root);
+                if (root !== null) up = upIn(m.qpos0, root);
             }
             const s = { nan: null, zero: [], same: null };
             if (!finite(d.qpos) || !finite(d.qvel)) s.nan = "state";
@@ -768,9 +768,8 @@ _TELEMETRY = """(() => {
                 last = Float32Array.from(act);
             }
             if (root !== null) {
-                const q = d.qpos, [w, x, y, z] = q.slice(root + 3, root + 7);
-                s.z = q[root + 2];
-                const c = 2 * (x * z - w * y) * up[0] + 2 * (y * z + w * x) * up[1] + (1 - 2 * (x * x + y * y)) * up[2];
+                const u = upIn(d.qpos, root), c = u[0] * up[0] + u[1] * up[1] + u[2] * up[2];
+                s.z = d.qpos[root + 2];
                 s.tilt = (Math.acos(Math.max(-1, Math.min(1, c))) * 180) / Math.PI;
             }
             rec.steps.push(s);
