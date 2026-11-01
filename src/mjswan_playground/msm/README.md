@@ -100,8 +100,8 @@ frames after the current one, for upstream's `motion_end`.
 | latents vs upstream's demo, 18150 frames | 8.9e-05 | 4.5e-05 |
 | decoder vs upstream's exported one, 16 rows | 1.4e-06 | 2.1e-06 |
 | the clips' tracked bodies vs upstream's kinematics (m) | 7.2e-07 | 7.2e-07 |
-| a reset's state vs upstream's (`init.bin`), 32 clips: in mjlab, qpos / qvel | 6.0e-08 / 7.5e-08 | 1.2e-07 / 6.0e-08 |
-| same, as mjswan's tracking command writes it | 6.0e-08 / 0 | 6.0e-08 / 0 |
+| a reset's state vs upstream's (`init.bin`), 32 clips: in mjlab, qpos / qvel | 6.0e-08 / 4.5e-08 | 1.2e-07 / 6.0e-08 |
+| same, as mjswan's tracking command writes it | 6.0e-08 / 4.6e-08 | 6.0e-08 / 3.4e-08 |
 | the latent the policy sees each step vs the demo's for that frame, 32 clips | 8.9e-05 | 4.5e-05 |
 | observation vs upstream's, on its own play rollouts: muscle length (m) | 3.3e-02 | 5.0e-02 |
 | same: muscle velocity (m/s) / force (N) | 9.4e-02 / 482 | 0.18 / 695 |
@@ -134,9 +134,9 @@ rows next to it differ from it by at least 7.9e-04.
 - **mjlab's `MotionCommand` replaces upstream's**, and mjswan runs it as its own tracking
   command, the viewer picking the clip; upstream's play config replays the first.
   - Like upstream's, and unlike mjlab's own, it keeps the frame a reset writes through
-    the step the reset lands in, so the policy sees frame n at step n, and it writes the
-    joints unclipped: upstream's reset leaves a coupled joint up to 1e-4 rad past its
-    range, on its polynomial.
+    the step the reset lands in, so the policy sees frame n at step n, and its
+    `hold_reset_frame` tells mjswan to. It writes the joints unclipped: upstream's reset
+    leaves a coupled joint up to 1e-4 rad past its range, on its polynomial.
   - The latent and the clip's end come from the clip's `latent` and `frames_left`.
   - The terminations are upstream's four: the clip's last frame as a time-out, and the
     mean tracked-body, root position and root orientation deviations past 1 m or 1 rad.
@@ -146,14 +146,6 @@ rows next to it differ from it by at least 7.9e-04.
   - On MyoFullBody it tracks the free joint's body, `Full Body`, in place of upstream's
     first, the pelvis inside it: the same origin, turned. mjlab and mjswan write the first
     tracked body's pose into the free joint.
-  - Each clip's first frame holds the root's angular velocity in the root's own frame,
-    since mjswan writes it into the free joint's velocity unrotated, where mjlab rotates
-    it out of the world's; the command here writes it the same way. Both resets are then
-    upstream's.
-- **In the browser, a clip picked or reset in the viewer runs a step behind.** mjswan's
-  tracking command keeps a reset's frame for one more step when the reset comes between
-  steps, so that episode sees each latent one control step late, and lasts a step longer.
-  The episodes after it, which `motion_end` starts, match upstream's frame for frame.
 - **The muscle action runs as mjswan's.** Upstream's `MuscleExcitationAction` writes each
   excitation, clipped to [0, 1], to its muscle's `ctrl` through the tendon's effort
   target, which mjswan does not run; under the name of mjswan's muscle action, which in

@@ -308,12 +308,6 @@ def _replay(
         out["quat"].append(data.xquat[bodies].copy())
         out["lin"].append(cvel[:, 3:] + np.cross(cvel[:, :3], pos - com))
         out["ang"].append(cvel[:, :3].copy())
-    ang = np.stack(out["ang"])
-    # ponytail: mjswan's TrackingCommand writes the root's body_ang_vel_w into qvel
-    # unrotated, where mjlab rotates it into the root's frame, so the first frame holds it
-    # in that frame and `terms.MotionCommand` writes it as mjswan does. Drop both once
-    # mjswan rotates it.
-    ang[0, kin.info.root_id - 1] = qvel[0, 3:6]
     return {
         "fps": np.array([FPS]),
         "joint_pos": qpos[:, 7:].astype(np.float32),
@@ -321,6 +315,6 @@ def _replay(
         "body_pos_w": np.stack(out["pos"]).astype(np.float32),
         "body_quat_w": np.stack(out["quat"]).astype(np.float32),
         "body_lin_vel_w": np.stack(out["lin"]).astype(np.float32),
-        "body_ang_vel_w": ang.astype(np.float32),
+        "body_ang_vel_w": np.stack(out["ang"]).astype(np.float32),
         "body_names": np.array([model.body(b).name for b in range(1, model.nbody)]),
     }
