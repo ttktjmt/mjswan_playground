@@ -35,7 +35,7 @@ class MotionCommandCfg(mdp.MotionCommandCfg):
     joint_position_range: tuple[float, float] = (0.0, 0.0)
     sampling_mode: str = "start"
     resampling_time_range: tuple[float, float] = (_NEVER, _NEVER)
-    # The reference drawn as upstream's demo draws it: a translucent blue ghost.
+    # The reference's ghost, as upstream's demo draws it: 0x5a99ff at opacity 0.28.
     debug_vis: bool = True
     viz: mdp.MotionCommandCfg.VizCfg = field(
         default_factory=lambda: mdp.MotionCommandCfg.VizCfg(
