@@ -1261,6 +1261,11 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fb/32/179d65ad31d235188b8fdedb01969e56880d4341004d42333f5feca62003/mjswan-0.12.7-py3-none-any.whl", hash = "sha256:80ec39f7e2701821bd1b9e87a2e4b0d11195b373de4632f72177faa3347f1323", size = 11951898, upload-time = "2026-10-31T17:28:35.089Z" },
 ]
 
+[package.optional-dependencies]
+hf = [
+    { name = "huggingface-hub" },
+]
+
 [[package]]
 name = "mjswan-playground"
 version = "0.1.0"
@@ -1276,6 +1281,7 @@ dependencies = [
 
 [package.optional-dependencies]
 msm = [
+    { name = "mjswan", extra = ["hf"] },
     { name = "musclemimic-models" },
     { name = "onnxruntime" },
 ]
@@ -1312,6 +1318,7 @@ previews = [
 requires-dist = [
     { name = "mjlab", specifier = "==1.6.0" },
     { name = "mjswan", specifier = ">=0.12.7" },
+    { name = "mjswan", extras = ["hf"], marker = "extra == 'msm'" },
     { name = "musclemimic-models", marker = "extra == 'msm'", specifier = "==1.0.6" },
     { name = "myosuite", extras = ["musclemimic"], marker = "extra == 'musclemimic'", git = "https://github.com/MyoHub/myosuite?rev=992bd58928e61d3f7ce27a033be02d0be18a2c18" },
     { name = "myosuite", extras = ["musclemimic"], marker = "extra == 'terra'", git = "https://github.com/MyoHub/myosuite?rev=992bd58928e61d3f7ce27a033be02d0be18a2c18" },
