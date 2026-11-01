@@ -18,6 +18,10 @@ from . import terms, upstream
 #: Scene name -> the body it runs.
 SCENES = {"MS-Human-700": upstream.MS_HUMAN_700, "MyoFullBody": upstream.MYOFULLBODY}
 
+#: Parts built on their own for mjswan Cloud, which takes 100 MB where the whole uploads
+#: 179 MB: one body each.
+PARTS = {"msm-mshuman": ("MS-Human-700",), "msm-myofullbody": ("MyoFullBody",)}
+
 
 def play_env_cfg(
     body: upstream.Body, root: Path
@@ -78,14 +82,15 @@ def play_env_cfg(
     return env_cfg, onnx_path, clips, kin.info.joint_names
 
 
-def setup_builder() -> mjswan.Builder:
+def setup_builder(part: str | None = None) -> mjswan.Builder:
     root = upstream.resolve_root()
     upstream.register_tasks(root)
 
     builder = mjswan.Builder()
     # The checkpoints state no license.
     project = builder.add_project(name="SuperMimic")
-    for name, body in SCENES.items():
+    for name in PARTS[part] if part else SCENES:
+        body = SCENES[name]
         env_cfg, onnx_path, clips, joint_names = play_env_cfg(body, root)
         scene = project.add_scene_mjlab(body.task_id, name=name, env_cfg=env_cfg)
         policy = scene.add_policy(

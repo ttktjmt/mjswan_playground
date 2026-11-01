@@ -41,6 +41,15 @@ revision (322 MB and 258 MB), and converts each policy's decoder and each clip b
 them. The clips take 63 MB and 66 MB of the build; the browser fetches one when it is
 picked.
 
+The whole build uploads 179 MB, over the 100 MB that mjswan Cloud takes, so `PARTS`
+splits it into two uploads, one body each, built by their own IDs
+(`uv run msp build msm-mshuman`):
+
+| Part | Scene | Upload | On mjswan Cloud |
+|---|---|---:|---|
+| `msm-mshuman` | MS-Human-700 | 95 MB | not yet |
+| `msm-myofullbody` | MyoFullBody | 84 MB | not yet |
+
 | Policy | Upstream task | Checkpoint |
 |---|---|---|
 | MS-Human-700 `model_016000` | `Mjlab-SuperMimic-Flat-MS-Human-700-Locked-Hands` | `mshuman700/kit_mm_euler_sgc100/model_016000.pt` |
