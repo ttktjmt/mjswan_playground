@@ -12,7 +12,7 @@ latent.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from typing import Any, Callable
 
 import numpy as np
@@ -35,6 +35,13 @@ class MotionCommandCfg(mdp.MotionCommandCfg):
     joint_position_range: tuple[float, float] = (0.0, 0.0)
     sampling_mode: str = "start"
     resampling_time_range: tuple[float, float] = (_NEVER, _NEVER)
+    # The reference's ghost, as upstream's demo draws it: 0x5a99ff at opacity 0.28.
+    debug_vis: bool = True
+    viz: mdp.MotionCommandCfg.VizCfg = field(
+        default_factory=lambda: mdp.MotionCommandCfg.VizCfg(
+            ghost_color=(0.353, 0.6, 1.0, 0.28)
+        )
+    )
 
     def build(self, env: Any) -> MotionCommand:
         return MotionCommand(self, env)

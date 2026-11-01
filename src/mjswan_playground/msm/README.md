@@ -20,7 +20,10 @@ the excitation of every muscle at 100 Hz to track motion-capture clips. The view
 motion picker lists the 32 clips of upstream's own browser demo under its groups: walking
 forward, backward, slowly, at a medium pace and fast, running, turning left and right,
 circling either way, and walking with a support. A clip plays from its first frame, in
-the state upstream's reset writes, and starts over after its last.
+the state upstream's reset writes, and starts over after its last. Its reference is drawn
+as upstream's demo draws it, a translucent blue ghost at the clip's own place; nothing
+the policy reads places the body relative to it, so the body drifts from it as a clip
+goes on.
 
 | Scene | Body | Policy |
 |---|---|---|
