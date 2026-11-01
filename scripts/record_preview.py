@@ -108,7 +108,7 @@ class Preview:
             `seconds` split evenly between them: for a tracking policy, where the point
             is the range of motions rather than any single one. Empty films one segment
             of whatever `steps` left running.
-        query: Extra URL query, e.g. ``"ref=0"`` to drop the motion-tracking ghost.
+        query: Extra URL query, e.g. ``"debug=0"`` to hide the tracking ghost.
         from_reset: Press `r` just before rolling, so the clip runs from one reset. The
             first frame lands a few control steps after it, about ten with `--software`:
             with `seconds` that much under the episode length the GIF then loops on the
@@ -252,7 +252,7 @@ PREVIEWS: dict[str, Preview | tuple[Preview, ...]] = {
     ),
     # 4.64 s is the 232-frame clip, so the GIF is the whole kick from one reset.
     "spinkick": Preview(
-        query="ref=0",
+        query="debug=0",
         orbit=150,
         crop="719:526:115:122",
         from_reset=True,
@@ -297,7 +297,7 @@ PREVIEWS: dict[str, Preview | tuple[Preview, ...]] = {
         Preview(scene="unitree_g1_flat", orbit=-30, crop="766:560:97:90", seconds=4.0),
         Preview(
             scene="unitree_g1_tracking_no_state_estimation",
-            query="ref=0",
+            query="debug=0",
             orbit=-30,
             crop="766:560:97:90",
             settle=18,
