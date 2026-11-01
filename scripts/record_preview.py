@@ -503,29 +503,21 @@ PREVIEWS: dict[str, Preview | tuple[Preview, ...]] = {
             )
         ),
     ),
-    # One cut per body: three clips picked in the motion picker, each from frame 0.
+    # A run, a U-turn and a circle, each picked in the motion picker and filmed from its
+    # first frame to just short of its last (4.19 s, 5.11 s and 6.27 s long).
     "msm": tuple(
         Preview(
             scene=scene,
-            motions=motions,
+            motions=(motion,),
             orbit=60,
             crop="680:497:140:120",
             from_reset=True,
-            seconds=6.0,
+            seconds=seconds,
         )
-        for scene, motions in (
-            (
-                "ms_human_700",
-                (
-                    "4/WalkingStraightForward02",
-                    "6/WalkingStraightBackwards02",
-                    "348/walking_run06",
-                ),
-            ),
-            (
-                "myofullbody",
-                ("317/turn_left03", "3/walk_with_support04", "348/walking_run02"),
-            ),
+        for scene, motion, seconds in (
+            ("ms_human_700", "348/walking_run06", 4.0),
+            ("myofullbody", "317/turn_left03", 4.9),
+            ("ms_human_700", "4/WalkInClockwiseCircle01", 6.0),
         )
     ),
 }
