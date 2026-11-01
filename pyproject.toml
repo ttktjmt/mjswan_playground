@@ -9,7 +9,7 @@ authors = [{ name = "mjswan Developers" }]
 # pre-built wheel for 3.13+.
 requires-python = ">=3.11, <3.13"
 dependencies = [
-    "mjswan>=0.12.7",
+    "mjswan>=0.12.8",
     "mjlab==1.6.0",
     "torch>=2.9.1",
     "onnx>=1.20.0",
@@ -61,7 +61,6 @@ only-include = ["src"]
 # TERRA's code is only on feat/programmatic-waypoint-tasks; move to main once it merges.
 myosuite = { git = "https://github.com/MyoHub/myosuite", rev = "992bd58928e61d3f7ce27a033be02d0be18a2c18" }
 spinkick-example = { git = "https://github.com/mujocolab/g1_spinkick_example", rev = "f1c4b230bd1a76c44e801e49f079212b6c6487da" }
-mjswan = { git = "https://github.com/ttktjmt/mjswan", rev = "85ee2b934fc386f9533176c346c5e199b478f9c1" }
 
 [dependency-groups]
 dev = ["pytest>=9.0.2", "ruff==0.16.0"]

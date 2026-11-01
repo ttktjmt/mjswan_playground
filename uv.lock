@@ -1247,14 +1247,18 @@ wheels = [
 
 [[package]]
 name = "mjswan"
-version = "0.12.7"
-source = { git = "https://github.com/ttktjmt/mjswan?rev=85ee2b934fc386f9533176c346c5e199b478f9c1#85ee2b934fc386f9533176c346c5e199b478f9c1" }
+version = "0.12.8"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mujoco" },
     { name = "nodeenv" },
     { name = "onnx" },
     { name = "rich" },
     { name = "typer" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/6a/45/d2a6a4392d2d2c3c9bb9210815047cec67270505a0e61a9e6af08c9070f9/mjswan-0.12.8.tar.gz", hash = "sha256:a39645ef7d5e563c7ca3522c410e285eee1d0b5820384a6143b671762d1918f7", size = 11695983, upload-time = "2026-11-01T14:04:32.941Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/14/fa/4bad568785075b606f20c7996d7167c5e2ef746f8e95aaedd640c54d8adb/mjswan-0.12.8-py3-none-any.whl", hash = "sha256:ec27ff736d51b3543d68ea75408af278eec2c6d4fc87c950fd096a693a07af68", size = 11953126, upload-time = "2026-11-01T14:04:30.504Z" },
 ]
 
 [package.optional-dependencies]
@@ -1313,8 +1317,8 @@ previews = [
 [package.metadata]
 requires-dist = [
     { name = "mjlab", specifier = "==1.6.0" },
-    { name = "mjswan", git = "https://github.com/ttktjmt/mjswan?rev=85ee2b934fc386f9533176c346c5e199b478f9c1" },
-    { name = "mjswan", extras = ["hf"], marker = "extra == 'msm'", git = "https://github.com/ttktjmt/mjswan?rev=85ee2b934fc386f9533176c346c5e199b478f9c1" },
+    { name = "mjswan", specifier = ">=0.12.8" },
+    { name = "mjswan", extras = ["hf"], marker = "extra == 'msm'" },
     { name = "musclemimic-models", marker = "extra == 'msm'", specifier = "==1.0.6" },
     { name = "myosuite", extras = ["musclemimic"], marker = "extra == 'musclemimic'", git = "https://github.com/MyoHub/myosuite?rev=992bd58928e61d3f7ce27a033be02d0be18a2c18" },
     { name = "myosuite", extras = ["musclemimic"], marker = "extra == 'terra'", git = "https://github.com/MyoHub/myosuite?rev=992bd58928e61d3f7ce27a033be02d0be18a2c18" },
