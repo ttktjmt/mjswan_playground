@@ -3,10 +3,10 @@ revision = 5
 requires-python = ">=3.11, <3.13"
 resolution-markers = [
     "python_full_version >= '3.12' and sys_platform == 'win32'",
-    "python_full_version < '3.12' and sys_platform == 'win32'",
     "python_full_version >= '3.12' and sys_platform == 'emscripten'",
-    "python_full_version < '3.12' and sys_platform == 'emscripten'",
     "python_full_version >= '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'win32'",
+    "python_full_version < '3.12' and sys_platform == 'emscripten'",
     "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
@@ -1247,14 +1247,18 @@ wheels = [
 
 [[package]]
 name = "mjswan"
-version = "0.12.6"
-source = { git = "https://github.com/ttktjmt/mjswan?rev=1ca686fc8b486cb35baedde42fa1f5787b2c3cf3#1ca686fc8b486cb35baedde42fa1f5787b2c3cf3" }
+version = "0.12.7"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mujoco" },
     { name = "nodeenv" },
     { name = "onnx" },
     { name = "rich" },
     { name = "typer" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ba/47/4ed029213fae1a7e5ea7981c6fb512a931c300d10d404edc1d2eaa375901/mjswan-0.12.7.tar.gz", hash = "sha256:770c3d1cb8616dffa8164c6840bb8b28319a80d204457f4088ecfc214d91b9f0", size = 11695208, upload-time = "2026-10-31T17:28:37.576Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fb/32/179d65ad31d235188b8fdedb01969e56880d4341004d42333f5feca62003/mjswan-0.12.7-py3-none-any.whl", hash = "sha256:80ec39f7e2701821bd1b9e87a2e4b0d11195b373de4632f72177faa3347f1323", size = 11951898, upload-time = "2026-10-31T17:28:35.089Z" },
 ]
 
 [[package]]
@@ -1307,7 +1311,7 @@ previews = [
 [package.metadata]
 requires-dist = [
     { name = "mjlab", specifier = "==1.6.0" },
-    { name = "mjswan", git = "https://github.com/ttktjmt/mjswan?rev=1ca686fc8b486cb35baedde42fa1f5787b2c3cf3" },
+    { name = "mjswan", specifier = ">=0.12.7" },
     { name = "musclemimic-models", marker = "extra == 'msm'", specifier = "==1.0.6" },
     { name = "myosuite", extras = ["musclemimic"], marker = "extra == 'musclemimic'", git = "https://github.com/MyoHub/myosuite?rev=992bd58928e61d3f7ce27a033be02d0be18a2c18" },
     { name = "myosuite", extras = ["musclemimic"], marker = "extra == 'terra'", git = "https://github.com/MyoHub/myosuite?rev=992bd58928e61d3f7ce27a033be02d0be18a2c18" },
