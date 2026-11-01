@@ -18,7 +18,6 @@ from typing import Any, Callable
 import numpy as np
 import torch
 from mjlab.tasks.tracking import mdp
-from mjlab.utils.lab_api.math import quat_apply
 
 from .upstream import FRAME_FIELDS
 
@@ -35,6 +34,8 @@ class MotionCommandCfg(mdp.MotionCommandCfg):
     joint_position_range: tuple[float, float] = (0.0, 0.0)
     sampling_mode: str = "start"
     resampling_time_range: tuple[float, float] = (_NEVER, _NEVER)
+    # Tells mjswan the command holds the frame a reset writes, as `MotionCommand` does.
+    hold_reset_frame: bool = True
     # The reference's ghost, as upstream's demo draws it: 0x5a99ff at opacity 0.28.
     debug_vis: bool = True
     viz: mdp.MotionCommandCfg.VizCfg = field(
@@ -72,8 +73,8 @@ class MotionCommand(mdp.MotionCommand):
         return extras
 
     def _update_command(self, env_ids: torch.Tensor | None = None) -> None:
-        # Hold the frame a reset wrote through the next update, as upstream's command and
-        # mjswan's do; mjlab's steps past it.
+        # Hold the frame a reset wrote through the next update, as upstream's command does;
+        # mjlab's steps past it.
         ids = slice(None) if env_ids is None else env_ids
         self.time_steps[ids] -= self._held[ids].long()
         self._held[ids] = False
@@ -89,12 +90,10 @@ class MotionCommand(mdp.MotionCommand):
         joint_pos: torch.Tensor,
         joint_vel: torch.Tensor,
     ) -> None:
-        """mjlab's, written as mjswan writes it: the joints unclipped, as upstream's reset
+        """mjlab's, with the joints unclipped, as mjswan writes them: upstream's reset
         leaves a coupled joint up to 1e-4 rad past its range on its ``<equality>``
-        polynomial, and the root's angular velocity, in the root's frame at the first
-        frame (see the ponytail in `upstream`), straight into qvel."""
+        polynomial."""
         self.robot.write_joint_state_to_sim(joint_pos, joint_vel, env_ids=env_ids)
-        root_ang_vel = quat_apply(root_ori, root_ang_vel)
         self.robot.write_root_state_to_sim(
             torch.cat([root_pos, root_ori, root_lin_vel, root_ang_vel], -1),
             env_ids=env_ids,

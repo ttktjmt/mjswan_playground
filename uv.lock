@@ -1247,7 +1247,7 @@ wheels = [
 
 [[package]]
 name = "mjswan"
-version = "0.12.7"
+version = "0.12.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mujoco" },
@@ -1256,9 +1256,9 @@ dependencies = [
     { name = "rich" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ba/47/4ed029213fae1a7e5ea7981c6fb512a931c300d10d404edc1d2eaa375901/mjswan-0.12.7.tar.gz", hash = "sha256:770c3d1cb8616dffa8164c6840bb8b28319a80d204457f4088ecfc214d91b9f0", size = 11695208, upload-time = "2026-10-31T17:28:37.576Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6a/45/d2a6a4392d2d2c3c9bb9210815047cec67270505a0e61a9e6af08c9070f9/mjswan-0.12.8.tar.gz", hash = "sha256:a39645ef7d5e563c7ca3522c410e285eee1d0b5820384a6143b671762d1918f7", size = 11695983, upload-time = "2026-11-01T14:04:32.941Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fb/32/179d65ad31d235188b8fdedb01969e56880d4341004d42333f5feca62003/mjswan-0.12.7-py3-none-any.whl", hash = "sha256:80ec39f7e2701821bd1b9e87a2e4b0d11195b373de4632f72177faa3347f1323", size = 11951898, upload-time = "2026-10-31T17:28:35.089Z" },
+    { url = "https://files.pythonhosted.org/packages/14/fa/4bad568785075b606f20c7996d7167c5e2ef746f8e95aaedd640c54d8adb/mjswan-0.12.8-py3-none-any.whl", hash = "sha256:ec27ff736d51b3543d68ea75408af278eec2c6d4fc87c950fd096a693a07af68", size = 11953126, upload-time = "2026-11-01T14:04:30.504Z" },
 ]
 
 [package.optional-dependencies]
@@ -1317,7 +1317,7 @@ previews = [
 [package.metadata]
 requires-dist = [
     { name = "mjlab", specifier = "==1.6.0" },
-    { name = "mjswan", specifier = ">=0.12.7" },
+    { name = "mjswan", specifier = ">=0.12.8" },
     { name = "mjswan", extras = ["hf"], marker = "extra == 'msm'" },
     { name = "musclemimic-models", marker = "extra == 'msm'", specifier = "==1.0.6" },
     { name = "myosuite", extras = ["musclemimic"], marker = "extra == 'musclemimic'", git = "https://github.com/MyoHub/myosuite?rev=992bd58928e61d3f7ce27a033be02d0be18a2c18" },
