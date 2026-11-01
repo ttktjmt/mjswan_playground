@@ -46,6 +46,7 @@ _PARTS: dict[str, str] = {
     ),
     **dict.fromkeys(("wuji-reorient", "wuji-penspin"), "mjswan_playground.wuji.main"),
     "orcs-open": "mjswan_playground.orcs.main",
+    **dict.fromkeys(("msm-mshuman", "msm-myofullbody"), "mjswan_playground.msm.main"),
 }
 
 ALL_PARTS: tuple[str, ...] = tuple(_PARTS)

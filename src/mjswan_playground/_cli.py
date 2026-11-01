@@ -93,6 +93,7 @@ def _unservable_command_slots(manifest: dict) -> list[str]:
         for scene in project.get("scenes", []):
             for mdp in scene.get("mdps", []):
                 commands = mdp.get("commands") or {}
+                frame_fields = _frame_fields(scene, mdp.get("id"))
                 for where, slot in _command_slots(mdp):
                     read = (
                         f"{scene.get('id')}/{mdp.get('id')}{where}: "
@@ -107,11 +108,28 @@ def _unservable_command_slots(manifest: dict) -> list[str]:
                         served = ["command"] + [
                             field["name"] for field in command.get("state_fields", [])
                         ]
+                    elif command.get("name") == "TrackingCommand":
+                        served = [
+                            *_NATIVE_COMMAND_FIELDS["TrackingCommand"],
+                            *frame_fields,
+                        ]
                     else:
                         served = _NATIVE_COMMAND_FIELDS.get(command.get("name"))
                     if served is not None and slot["field"] not in served:
                         problems.append(f"{read} (serves {', '.join(served)})")
     return problems
+
+
+def _frame_fields(scene: dict, mdp_id: str) -> list[str]:
+    """The arrays a ``TrackingCommand`` serves besides its own fields: those every motion
+    of the MDP's policies lists in its ``frame_fields``."""
+    listed = [
+        set(motion.get("frame_fields", ()))
+        for policy in scene.get("policies", [])
+        if policy.get("mdp") == mdp_id
+        for motion in policy.get("motions", [])
+    ]
+    return sorted(set.intersection(*listed)) if listed else []
 
 
 def _command_slots(node, where: str = ""):

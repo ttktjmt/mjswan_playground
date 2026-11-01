@@ -4,8 +4,9 @@ Upstream's policy is a motion encoder over the reference alone and a decoder ove
 body's state. The encoder's input depends on nothing the body does, so its latent is
 evaluated here for every frame of the clips, as upstream's own browser demo does
 (``export_web.py``), and the browser runs the decoder alone. Both come from the Hub
-checkpoint; the clips are rebuilt from the demo's files in upstream's git, since the
-dataset they were retargeted from is gated.
+checkpoint. The clips are rebuilt from the demo's files in upstream's git, since the
+dataset they were retargeted from is gated, each into an mjlab motion ``.npz`` that also
+carries its frames' latents.
 """
 
 from __future__ import annotations
@@ -15,7 +16,9 @@ import gzip
 import importlib
 import json
 import os
+import re
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -31,6 +34,23 @@ TASK_PACKAGE = "muscle_supermimic.tasks"
 
 POLICY_REPO_ID = "Beanpow/muscle-supermimic"
 POLICY_REVISION = "d3fdd54eedea09411f5c9750ff59a61996febc9f"
+
+#: The control rate, which the demo's clips are sampled at.
+FPS = 100
+#: The demo's clip menu groups (``main.mjs``'s ``KINDS``): the first match names a clip's.
+KINDS = (
+    (r"WalkingStraightForward|/walking_?\d|walking_forward", "Walk forward"),
+    (r"Backwards", "Walk backward"),
+    (r"walking_slow", "Walk slowly"),
+    (r"walking_medium", "Walk at a medium pace"),
+    (r"walking_fast", "Walk fast"),
+    (r"walking_run", "Run"),
+    (r"LeftTurn|turn_left", "Turn left"),
+    (r"RightTurn|turn_right", "Turn right"),
+    (r"CounterClockwise", "Walk a counter-clockwise circle"),
+    (r"Clockwise", "Walk a clockwise circle"),
+    (r"support|handrail", "Walk with a support"),
+)
 
 _CACHE = CACHE_DIR / "msm"
 
@@ -54,6 +74,20 @@ MYOFULLBODY = Body(
     task_id="Mjlab-SuperMimic-Flat-MyoFullBody",
     checkpoint="myofullbody/kit_n4096_euler_sgc100/model_016000.pt",
 )
+
+
+@dataclasses.dataclass(frozen=True)
+class Clip:
+    name: str
+    """Upstream's, without its ``_poses`` suffix."""
+    group: str
+    path: Path
+    """An mjlab motion ``.npz`` with the per-frame arrays :data:`FRAME_FIELDS` too."""
+
+
+#: ``latent``: the encoder's latent of each frame's goal. ``frames_left``: the frames
+#: after it in the clip, which upstream's ``motion_end`` counts down.
+FRAME_FIELDS = ("latent", "frames_left")
 
 
 def resolve_root() -> Path:
@@ -86,33 +120,21 @@ def register_tasks(root: Path) -> None:
     importlib.import_module(TASK_PACKAGE)
 
 
-@dataclasses.dataclass
-class Tables:
-    """Per frame of every clip, back to back, and per clip, as the port reads them."""
-
-    clip_start: np.ndarray
-    clip_len: np.ndarray
-    latent: np.ndarray
-    """``(frames, 32)``: the encoder's latent of each frame's goal."""
-    init: np.ndarray
-    """``(clips, nq + nv)``: the state upstream's reset writes at each clip's first frame."""
-    root_pos: np.ndarray
-    root_rot: np.ndarray
-    """``(frames, 3, 3)``: the canonical root frame (x forward, z up) of the reference."""
-    body_rpos: np.ndarray
-    """``(frames, tracked - 1, 3)``: the tracked bodies relative to the first one."""
-
-
-def ensure_policy(body: Body, root: Path, env_cfg: object) -> tuple[Path, Tables]:
-    """The decoder as ONNX, and the clip tables, converted once into the cache."""
-    stem = Path(body.checkpoint).stem
-    onnx_path = _CACHE / body.key / f"{stem}.onnx"
-    tables_path = _CACHE / body.key / f"{stem}_tables.npz"
-    if not (onnx_path.exists() and tables_path.exists()):
-        _convert(body, root, env_cfg, onnx_path, tables_path)
-    with np.load(tables_path) as data:
-        fields = {f.name: data[f.name] for f in dataclasses.fields(Tables)}
-    return onnx_path, Tables(**fields)
+def ensure_policy(body: Body, root: Path, env_cfg: object) -> tuple[Path, list[Clip]]:
+    """The decoder as ONNX, and the demo's clips as motions, converted once into the
+    cache."""
+    demo = root / "docs" / "website" / "demo" / "data" / body.key
+    meta = json.loads((demo / "meta.json").read_text())
+    onnx_path = _CACHE / body.key / f"{Path(body.checkpoint).stem}.onnx"
+    clips = []
+    for clip in meta["clips"]:
+        name = clip["name"].removesuffix("_poses")
+        group = next(label for pattern, label in KINDS if re.search(pattern, name))
+        path = _CACHE / body.key / "motions" / f"{name.replace('/', '_')}.npz"
+        clips.append(Clip(name, group, path))
+    if not (onnx_path.exists() and all(clip.path.exists() for clip in clips)):
+        _convert(body, demo, meta, env_cfg, onnx_path, clips)
+    return onnx_path, clips
 
 
 def _frames(demo: Path, meta: dict, clip: dict) -> np.ndarray:
@@ -122,12 +144,16 @@ def _frames(demo: Path, meta: dict, clip: dict) -> np.ndarray:
 
 
 def _convert(
-    body: Body, root: Path, env_cfg: object, onnx_path: Path, tables_path: Path
+    body: Body,
+    demo: Path,
+    meta: dict,
+    env_cfg: object,
+    onnx_path: Path,
+    clips: list[Clip],
 ) -> None:
     import onnxruntime as ort
     import torch
     from huggingface_hub import hf_hub_download
-    from muscle_supermimic.assets.robots.model_info import ModelInfo
     from muscle_supermimic.rl.supermimic.networks import Policy
     from muscle_supermimic.tasks.tracking.mdp.heads import StepCtx, TrackingHeads
     from muscle_supermimic.tasks.tracking.mdp.kinematics import SkeletonKinematics
@@ -138,25 +164,20 @@ def _convert(
         store_fp16,
     )
 
-    demo = root / "docs" / "website" / "demo" / "data" / body.key
-    meta = json.loads((demo / "meta.json").read_text())
     command = env_cfg.commands["motion"]
     model = env_cfg.scene.entities["robot"].spec_fn().compile()
-    info = ModelInfo(model)
+    kin = SkeletonKinematics(command.body_names, "cpu", model)
 
     # Each clip as upstream's MuscleMimic trajectory format at the control rate, which
     # MotionLib reads back frame for frame.
-    clip_dir = onnx_path.parent / "clips"
-    joint_names = np.array([info.root_joint_name, *info.joint_names])
-    files = []
-    for clip in meta["clips"]:
-        path = clip_dir / f"{clip['name']}.npz"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        qpos = _frames(demo, meta, clip)[:, meta["nz"] :].astype(np.float64)
-        np.savez(path, qpos=qpos, joint_names=joint_names, frequency=100.0)
-        files.append(str(path))
-    kin = SkeletonKinematics(command.body_names, "cpu", model)
-    motion = MotionLib(files, kin, 0.01, "cpu")
+    joint_names = np.array([kin.info.root_joint_name, *kin.info.joint_names])
+    with tempfile.TemporaryDirectory() as tmp:
+        files = []
+        for k, clip in enumerate(meta["clips"]):
+            qpos = _frames(demo, meta, clip)[:, meta["nz"] :].astype(np.float64)
+            files.append(str(Path(tmp) / f"{k}.npz"))
+            np.savez(files[-1], qpos=qpos, joint_names=joint_names, frequency=FPS)
+        motion = MotionLib(files, kin, 1.0 / FPS, "cpu")
     heads = TrackingHeads(kin, motion, None, command.lookahead, command.stride)
 
     checkpoint = torch.load(
@@ -224,13 +245,82 @@ def _convert(
         raise RuntimeError(f"The decoder disagrees with upstream's demo by {error:.2e}")
 
     init = np.fromfile(demo / meta["files"]["init"], "<f8")
-    np.savez(
-        tables_path,
-        clip_start=motion.clip_start.numpy(),
-        clip_len=motion.clip_len.numpy(),
-        latent=latent.astype(np.float32),
-        init=init.reshape(len(meta["clips"]), meta["nq"] + meta["nv"]),
-        root_pos=motion.root_p.numpy(),
-        root_rot=motion.root_R.numpy(),
-        body_rpos=heads.ref_rpos.numpy(),
-    )
+    init = init.reshape(len(clips), meta["nq"] + meta["nv"])
+    # Their rows in the motion, which skips the world body.
+    tracked = np.array([model.body(name).id - 1 for name in command.body_names])
+    for k, clip in enumerate(clips):
+        start, n = int(motion.clip_start[k]), int(motion.clip_len[k])
+        frames = slice(start, start + n)
+        motion_npz = _replay(model, kin, motion, frames, init[k])
+        error = np.abs(
+            motion_npz["body_pos_w"][:, tracked] - motion.body_p[frames].numpy()
+        ).max()
+        if error > 1e-4:
+            raise RuntimeError(
+                f"{clip.name}: MuJoCo puts the tracked bodies {error:.2e} m from "
+                "upstream's kinematics"
+            )
+        clip.path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(
+            clip.path,
+            **motion_npz,
+            latent=latent[frames].astype(np.float32),
+            frames_left=np.arange(n - 1, -1, -1, dtype=np.float32)[:, None],
+        )
+
+
+def _replay(
+    model: object,
+    kin: object,
+    motion: object,
+    frames: slice,
+    init: np.ndarray,
+) -> dict[str, np.ndarray]:
+    """One clip as ``mjlab.scripts.csv_to_npz`` writes it: each frame's state set and
+    every body of the entity recorded. The state is upstream's reference, velocities
+    included, and at the first frame the state upstream's reset writes (``init.bin``)."""
+    import mujoco
+    import torch
+    from muscle_supermimic.utils.rotations import mat_to_quat
+
+    root_R = motion.root_R[frames] @ kin.R_off.T
+    q, qd = kin.full_joint_state(motion.q[frames], motion.qd[frames])
+    # The free joint's qvel holds the angular velocity in the root's own frame.
+    w = (root_R.transpose(-1, -2) @ motion.root_w[frames].unsqueeze(-1)).squeeze(-1)
+    qpos = torch.cat([motion.root_p[frames], mat_to_quat(root_R), q], -1).numpy()
+    qvel = torch.cat([motion.root_v[frames], w, qd], -1).numpy()
+    if np.abs(np.concatenate([qpos[0], qvel[0]]) - init).max() > 1e-4:
+        raise RuntimeError("The first frame is not the state upstream's reset writes")
+    qpos[0], qvel[0] = init[: model.nq], init[model.nq :]
+
+    data = mujoco.MjData(model)
+    bodies = slice(1, model.nbody)
+    out = {name: [] for name in ("pos", "quat", "lin", "ang")}
+    for qpos_t, qvel_t in zip(qpos, qvel):
+        data.qpos[:], data.qvel[:] = qpos_t, qvel_t
+        mujoco.mj_kinematics(model, data)
+        mujoco.mj_comPos(model, data)
+        mujoco.mj_comVel(model, data)
+        # cvel is about the subtree com of each body's root; mjlab's body_link_vel_w.
+        pos, cvel = data.xpos[bodies], data.cvel[bodies]
+        com = data.subtree_com[model.body_rootid[bodies]]
+        out["pos"].append(pos.copy())
+        out["quat"].append(data.xquat[bodies].copy())
+        out["lin"].append(cvel[:, 3:] + np.cross(cvel[:, :3], pos - com))
+        out["ang"].append(cvel[:, :3].copy())
+    ang = np.stack(out["ang"])
+    # ponytail: mjswan's TrackingCommand writes the root's body_ang_vel_w into qvel
+    # unrotated, where mjlab rotates it into the root's frame, so the first frame holds it
+    # in that frame and `terms.MotionCommand` writes it as mjswan does. Drop both once
+    # mjswan rotates it.
+    ang[0, kin.info.root_id - 1] = qvel[0, 3:6]
+    return {
+        "fps": np.array([FPS]),
+        "joint_pos": qpos[:, 7:].astype(np.float32),
+        "joint_vel": qvel[:, 6:].astype(np.float32),
+        "body_pos_w": np.stack(out["pos"]).astype(np.float32),
+        "body_quat_w": np.stack(out["quat"]).astype(np.float32),
+        "body_lin_vel_w": np.stack(out["lin"]).astype(np.float32),
+        "body_ang_vel_w": ang.astype(np.float32),
+        "body_names": np.array([model.body(b).name for b in range(1, model.nbody)]),
+    }
