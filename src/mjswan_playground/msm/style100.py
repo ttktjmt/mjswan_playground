@@ -36,6 +36,10 @@ ROOT_ENV_VAR = "MJSWAN_100STYLE_ROOT"
 #: 100STYLE v1 on Zenodo, and its archive of BVHs.
 ZENODO_RECORD = "8127870"
 ARCHIVE = "100STYLE.zip"
+#: Seconds a connection attempt or a read may stall. Without it, an address that drops
+#: packets unanswered (an IPv6 route a network blocks) holds urllib for the OS's TCP
+#: timeout, two minutes on Linux, before it tries the next one.
+TIMEOUT = 30
 
 
 def notice(*, mshuman700: bool) -> str:
@@ -322,17 +326,29 @@ def archive() -> Path:
 def _fetch(root: Path, wanted: set[str]) -> None:
     """Extract ``wanted`` from the record's BVH archive, checked against the checksum
     Zenodo lists for it; a Zenodo record's files never change."""
+    from tqdm import tqdm
+
     api = f"https://zenodo.org/api/records/{ZENODO_RECORD}"
-    with urllib.request.urlopen(api) as response:
+    with urllib.request.urlopen(api, timeout=TIMEOUT) as response:
         record = json.load(response)
     entry = next(f for f in record["files"] if f["key"] == ARCHIVE)
     algorithm, expected = entry["checksum"].split(":", 1)
     with tempfile.TemporaryFile() as download:
         digest = hashlib.new(algorithm)
-        with urllib.request.urlopen(entry["links"]["self"]) as response:
+        with (
+            tqdm(
+                total=entry["size"],
+                desc=f"{ARCHIVE} from Zenodo",
+                unit="B",
+                unit_scale=True,
+                unit_divisor=1024,
+            ) as progress,
+            urllib.request.urlopen(entry["links"]["self"], timeout=TIMEOUT) as response,
+        ):
             while chunk := response.read(1 << 20):
                 digest.update(chunk)
                 download.write(chunk)
+                progress.update(len(chunk))
         if digest.hexdigest() != expected:
             raise RuntimeError(
                 f"{ARCHIVE} has {algorithm} {digest.hexdigest()}, not {expected}."

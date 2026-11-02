@@ -1338,6 +1338,7 @@ msm = [
     { name = "onnxruntime" },
     { name = "qpsolvers", extra = ["daqp"] },
     { name = "rich" },
+    { name = "tqdm" },
 ]
 musclemimic = [
     { name = "myosuite", extra = ["musclemimic"] },
@@ -1389,6 +1390,7 @@ requires-dist = [
     { name = "rich", marker = "extra == 'msm'" },
     { name = "spinkick-example", marker = "extra == 'spinkick'", git = "https://github.com/mujocolab/g1_spinkick_example?rev=f1c4b230bd1a76c44e801e49f079212b6c6487da" },
     { name = "torch", specifier = ">=2.9.1" },
+    { name = "tqdm", marker = "extra == 'msm'" },
     { name = "typer", specifier = ">=0.12" },
     { name = "usd-core", marker = "extra == 'orcs'", specifier = ">=26.8" },
     { name = "wbc-mjlab", marker = "extra == 'wbc'", specifier = ">=0.0.6" },
