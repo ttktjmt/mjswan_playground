@@ -1,4 +1,5 @@
-"""100STYLE clips retargeted onto MyoFullBody, the clips the policies track here.
+"""The 100STYLE clips the policies track, retargeted onto MyoFullBody and from there
+onto MS-Human-700.
 
 100STYLE (Ian Mason, https://ianxmason.github.io/100style/, CC BY 4.0) is one actor's
 Xsens capture of 100 locomotion styles at 60 fps: a BVH per style and gait, Y up, Z
@@ -51,9 +52,7 @@ def notice(*, mshuman700: bool) -> str:
 
 #: 100STYLE's gait codes -> the motion picker's groups.
 GAITS = {"FW": "Walk forward", "SW": "Walk sideways"}
-#: How long each clip is, in seconds.
 CLIP_SECONDS = 8.0
-#: 100STYLE's frame rate.
 BVH_FPS = 60
 
 
@@ -78,14 +77,12 @@ class Clip:
         return f"{self.style}/{self.style}_{self.gait}.bvh"
 
 
-#: The clips both policies play from their reset to their end in the browser with no
-#: termination but the clip's end. Each starts where ``Frame_Cuts.csv`` says its capture
-#: does, but the neutral forward walk's, 8 s on and at 69 s, where it turns least. The
-#: policies learned on KIT walks at 0.4 to 0.7 m/s, and backwards only in straight lines,
-#: so each of these ends on a deviation: the runs (1 to 1.3 m/s), the backward walks and
-#: the other sideways ones, which 100STYLE's actor takes through turns at the edges of a
-#: 4.5 m square, and the forward walks of Akimbo, ArmsAboveHead, ArmsFolded, Elated,
-#: OnPhoneRight, Proud, Robot, Strutting and Zombie.
+#: The clips both policies play from their reset to their end in the browser. Each starts
+#: where ``Frame_Cuts.csv`` says its capture does, but the neutral forward walk's, 8 s on
+#: and at 69 s, where it turns least. The policies learned on KIT walks at 0.4 to 0.7 m/s,
+#: backwards only in straight lines, so these end on a deviation: the runs, the backward
+#: walks, the other sideways ones, and the forward walks of Akimbo, ArmsAboveHead,
+#: ArmsFolded, Elated, OnPhoneRight, Proud, Robot, Strutting and Zombie.
 CLIPS: tuple[Clip, ...] = (
     Clip("Neutral", "FW", 807),
     Clip("Neutral", "FW", 4140),
