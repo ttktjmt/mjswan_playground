@@ -48,3 +48,26 @@ def test_pinned_checkout_is_not_refetched(tmp_path, monkeypatch):
     assert (
         _deps.ensure_repo(url="file:///nonexistent.git", **kwargs) == cache / "origin"
     )
+
+
+def test_paths_check_out_only_those_directories(tmp_path, monkeypatch):
+    origin = tmp_path / "origin"
+    for path in ("keep/a.py", "drop/b.bin"):
+        (origin / path).parent.mkdir(parents=True)
+        (origin / path).write_text(path)
+    _run(["git", "init", "-q", "-b", "main"], origin)
+    _run(["git", "add", "."], origin)
+    _commit("files", origin)
+    commit = _out(["git", "rev-parse", "HEAD"], origin)
+    monkeypatch.setattr(_deps, "CACHE_DIR", tmp_path / "cache")
+
+    repo = _deps.ensure_repo(
+        name="origin",
+        url=origin.as_uri(),
+        commit=commit,
+        marker="keep/a.py",
+        root_env_var="UNSET_ROOT",
+        paths=("keep",),
+    )
+    assert (repo / "keep" / "a.py").read_text() == "keep/a.py"
+    assert not (repo / "drop").exists()
