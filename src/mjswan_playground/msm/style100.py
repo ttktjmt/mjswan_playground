@@ -13,6 +13,7 @@ does for SMPL-H.
 from __future__ import annotations
 
 import contextlib
+import csv
 import dataclasses
 import hashlib
 import io
@@ -60,18 +61,24 @@ GAITS = {
 }
 
 
+#: How long each clip is, in seconds.
+CLIP_SECONDS = 8.0
+#: The table of where each BVH's capture starts and stops, beside the BVHs.
+CUTS = "Frame_Cuts.csv"
+
+
 @dataclasses.dataclass(frozen=True)
 class Clip:
     style: str
     gait: str
     """A key of :data:`GAITS`."""
-    start: float = 0.0
-    """Where the clip starts in its BVH, in seconds."""
-    end: float | None = None
+    window: int = 0
+    """Which :data:`CLIP_SECONDS` of the BVH, counted from the start ``CUTS`` gives."""
 
     @property
     def name(self) -> str:
-        return f"{self.style}/{self.gait}"
+        suffix = f"_{self.window + 1}" if self.window else ""
+        return f"{self.style}/{self.gait}{suffix}"
 
     @property
     def group(self) -> str:
@@ -82,8 +89,23 @@ class Clip:
         return f"{self.style}/{self.style}_{self.gait}.bvh"
 
 
-CLIPS: tuple[Clip, ...] = tuple(
-    Clip("Neutral", gait) for gait in ("FW", "BW", "SW", "FR", "BR", "SR")
+CLIPS: tuple[Clip, ...] = (
+    *(Clip("Neutral", gait, window) for gait in GAITS for window in range(2)),
+    *(
+        Clip(style, "FW")
+        for style in (
+            "Akimbo",
+            "ArmsAboveHead",
+            "Depressed",
+            "Elated",
+            "HandsInPockets",
+            "Old",
+            "Proud",
+            "Robot",
+            "Strutting",
+            "Zombie",
+        )
+    ),
 )
 
 #: MyoFullBody body -> the BVH joint it follows, then its (position, orientation) costs
@@ -295,16 +317,24 @@ def retarget(
 
 
 def archive() -> Path:
-    """A directory holding :data:`CLIPS`' BVHs as ``<style>/<style>_<gait>.bvh``: the
-    one ``MJSWAN_100STYLE_ROOT`` points at, else the cache, filled from Zenodo."""
+    """A directory laid out as the archive's ``100STYLE/``, with :data:`CUTS` and
+    :data:`CLIPS`' BVHs: the one ``MJSWAN_100STYLE_ROOT`` points at, else the cache,
+    filled from Zenodo."""
     configured = os.getenv(ROOT_ENV_VAR)
     if configured:
         return Path(configured).expanduser().resolve()
     root = _CACHE / "bvh"
-    wanted = {clip.bvh for clip in CLIPS}
-    if any(not (root / bvh).exists() for bvh in wanted):
+    wanted = {CUTS, *(clip.bvh for clip in CLIPS)}
+    if any(not (root / path).exists() for path in wanted):
         _fetch(root, wanted)
     return root
+
+
+def _cut(root: Path, clip: Clip) -> tuple[int, int]:
+    """The frames the clip's capture starts and stops at."""
+    with (root / CUTS).open(newline="") as f:
+        row = next(r for r in csv.DictReader(f) if r["STYLE_NAME"] == clip.style)
+    return int(row[f"{clip.gait}_START"]), int(row[f"{clip.gait}_STOP"])
 
 
 def _fetch(root: Path, wanted: set[str]) -> None:
@@ -326,11 +356,10 @@ def _fetch(root: Path, wanted: set[str]) -> None:
                 f"{ARCHIVE} has {algorithm} {digest.hexdigest()}, not {expected}."
             )
         with zipfile.ZipFile(download) as bundle:
-            members = {Path(n).name.lower(): n for n in bundle.namelist()}
-            for bvh in sorted(wanted):
-                target = root / bvh
+            for path in sorted(wanted):
+                target = root / path
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(bundle.read(members[Path(bvh).name.lower()]))
+                target.write_bytes(bundle.read(f"100STYLE/{path}"))
 
 
 def ensure_clips(*, mshuman700: bool) -> list[Path]:
@@ -342,10 +371,14 @@ def ensure_clips(*, mshuman700: bool) -> list[Path]:
         stem = clip.name.replace("/", "_")
         myofullbody = _CACHE / "myofullbody" / f"{stem}.npz"
         if not myofullbody.exists():
-            bvh = archive() / clip.bvh
-            fps = 1.0 / _frame_time(bvh)
-            end = None if clip.end is None else round(clip.end * fps)
-            residual = retarget(bvh, myofullbody, slice(round(clip.start * fps), end))
+            root = archive()
+            bvh = root / clip.bvh
+            length = round(CLIP_SECONDS / _frame_time(bvh))
+            first, last = _cut(root, clip)
+            start = first + clip.window * length
+            if start + length > last:
+                raise ValueError(f"{clip.name} runs past the end of its capture")
+            residual = retarget(bvh, myofullbody, slice(start, start + length))
             worst = max(residual, key=lambda body: residual[body].max())
             print(
                 f"{clip.name}: onto MyoFullBody, {100 * residual[worst].max():.1f} cm "
