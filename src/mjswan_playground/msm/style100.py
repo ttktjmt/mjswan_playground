@@ -263,10 +263,9 @@ def retarget(
 
     # Start on the first frame's root pose: the T-pose's, turned and moved with the hips,
     # and the couplers holding, which qpos0's knee translations do not.
+    info = ModelInfo(model)
     q = model.qpos0.copy()
-    q[7:] = ModelInfo(model).full_joint_pos(
-        np.zeros(len(ModelInfo(model).indep_names))
-    )[0]
+    q[7:] = info.full_joint_pos(np.zeros(len(info.indep_names)))[0]
     hips_pos, hips_quat = source[0]["Hips"]
     turn = R.from_quat(hips_quat, scalar_first=True) * R.from_matrix(BVH_TO_WORLD).inv()
     q[:3] = hips_pos * fit.human_scale_table["Hips"]
