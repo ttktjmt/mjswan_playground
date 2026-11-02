@@ -87,16 +87,18 @@ class Clip:
 CLIPS: tuple[Clip, ...] = (
     Clip("Neutral", "FW", 807),
     Clip("Neutral", "FW", 4140),
-    Clip("Akimbo", "FW", 384),
     Clip("Depressed", "FW", 410),
     Clip("HandsInPockets", "FW", 421),
     Clip("Old", "FW", 513),
-    Clip("Proud", "FW", 497),
-    Clip("Strutting", "FW", 508),
     Clip("Neutral", "SW", 354),
-    Clip("Neutral", "SW", 2160),
-    Clip("Neutral", "SW", 2700),
-    Clip("Neutral", "BW", 4440),
+    Clip("ArmsBySide", "FW", 350),
+    Clip("ArmsBehindBack", "FW", 433),
+    Clip("ArmsFolded", "FW", 392),
+    Clip("LookUp", "FW", 411),
+    Clip("Monk", "FW", 450),
+    Clip("OnPhoneRight", "FW", 400),
+    Clip("PigeonToed", "FW", 563),
+    Clip("DuckFoot", "FW", 635),
 )
 
 #: MyoFullBody body -> the BVH joint it follows, then its (position, orientation) costs
