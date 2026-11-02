@@ -46,16 +46,18 @@ revision (322 MB and 258 MB), and converts each policy's decoder beside them. It
 downloads 100STYLE's BVH archive from Zenodo, checked against the checksum the record
 lists, keeps the BVHs the clips cut from (or reads the directory `MJSWAN_100STYLE_ROOT`
 points at), checks out gmr_plus's Python package alone (its robot assets are 1.4 GB),
-and retargets each clip, onto MyoFullBody and from there onto MS-Human-700. The browser
-fetches a clip when it is picked.
+and retargets each clip, onto MyoFullBody and from there onto MS-Human-700. The archive
+is 1.5 GB, of which the clips' BVHs are 76 MB. The clips take 33 MB and 34 MB of the
+build; the browser fetches one when it is picked.
 
-The whole build is over the 100 MB that mjswan Cloud takes, so `PARTS` splits it into
-two uploads, one body each, built by their own IDs (`uv run msp build msm-mshuman`):
+The whole build uploads 118 MB, over the 100 MB that mjswan Cloud takes, so `PARTS`
+splits it into two uploads, one body each, built by their own IDs
+(`uv run msp build msm-mshuman`):
 
-| Part | Scene | On mjswan Cloud |
-|---|---|---|
-| `msm-mshuman` | MS-Human-700 | not yet |
-| `msm-myofullbody` | MyoFullBody | not yet |
+| Part | Scene | Upload | On mjswan Cloud |
+|---|---|---:|---|
+| `msm-mshuman` | MS-Human-700 | 65 MB | not yet |
+| `msm-myofullbody` | MyoFullBody | 53 MB | not yet |
 
 | Policy | Upstream task | Checkpoint |
 |---|---|---|
@@ -84,8 +86,8 @@ MyoFullBody run on the same task, which the model card says collapsed after it.
 
 The policy is a motion encoder over the reference alone and a decoder over the body's
 state, `sigmoid(dec(z, normalize(obs)))`. Nothing the body does reaches the encoder, so,
-as upstream's demo does, the build evaluates it once for every frame of the clips and
-the browser runs the decoder alone: `latent[1, 32]` and `policy[1, N]` to
+as upstream's demo does, the build evaluates it once for every frame of the clips (9564
+per body) and the browser runs the decoder alone: `latent[1, 32]` and `policy[1, N]` to
 the excitations, with N 3819 on MS-Human-700 and 2141 on MyoFullBody.
 
 Each clip is an mjlab motion `.npz`: mjlab's arrays, every body's pose and velocity per
@@ -106,7 +108,7 @@ frames after the current one, for upstream's `motion_end`.
 | Compared | MS-Human-700 | MyoFullBody |
 |---|---:|---:|
 | decoder vs upstream's exported one, 16 rows | 1.4e-06 | 2.1e-06 |
-| the clips' tracked bodies vs upstream's kinematics (m) | 7.2e-07 | 7.2e-07 |
+| the clips' tracked bodies vs upstream's kinematics (m) | 1.4e-06 | 1.4e-06 |
 | observation vs upstream's, on its own play rollouts: muscle length (m) | 3.3e-02 | 5.0e-02 |
 | same: muscle velocity (m/s) / force (N) | 9.4e-02 / 482 | 0.18 / 695 |
 | same: tracked-body positions (m) / angles (rad) / velocities | 1.0e-02 / 5.1e-03 / 0.10 | 3.4e-03 / 1.2e-02 / 0.30 |
