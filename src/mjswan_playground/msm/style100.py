@@ -13,7 +13,6 @@ does for SMPL-H.
 from __future__ import annotations
 
 import contextlib
-import csv
 import dataclasses
 import hashlib
 import io
@@ -51,20 +50,11 @@ def notice(*, mshuman700: bool) -> str:
 
 
 #: 100STYLE's gait codes -> the motion picker's groups.
-GAITS = {
-    "FW": "Walk forward",
-    "BW": "Walk backward",
-    "SW": "Walk sideways",
-    "FR": "Run",
-    "BR": "Run backward",
-    "SR": "Run sideways",
-}
-
-
+GAITS = {"FW": "Walk forward", "BW": "Walk backward", "SW": "Walk sideways"}
 #: How long each clip is, in seconds.
 CLIP_SECONDS = 8.0
-#: The table of where each BVH's capture starts and stops, beside the BVHs.
-CUTS = "Frame_Cuts.csv"
+#: 100STYLE's frame rate.
+BVH_FPS = 60
 
 
 @dataclasses.dataclass(frozen=True)
@@ -72,13 +62,12 @@ class Clip:
     style: str
     gait: str
     """A key of :data:`GAITS`."""
-    window: int = 0
-    """Which :data:`CLIP_SECONDS` of the BVH, counted from the start ``CUTS`` gives."""
+    start: int
+    """The BVH frame it starts at."""
 
     @property
     def name(self) -> str:
-        suffix = f"_{self.window + 1}" if self.window else ""
-        return f"{self.style}/{self.gait}{suffix}"
+        return f"{self.style}/{self.gait}_{self.start / BVH_FPS:.0f}s"
 
     @property
     def group(self) -> str:
@@ -89,23 +78,25 @@ class Clip:
         return f"{self.style}/{self.style}_{self.gait}.bvh"
 
 
+#: The clips the policies track to their end in the browser. The policies learned on KIT
+#: walks, at 0.4 to 0.7 m/s and backwards only in straight lines. 100STYLE's actor
+#: crosses a 4.5 m square, turning at its edges, so a clip starts where ``Frame_Cuts.csv``
+#: says the capture does, or inside a stretch where the hips turn slower than 60 deg/s.
+#: Left out, each failing on a deviation: the runs (1 to 1.3 m/s), the backward and
+#: sideways walks through a turn, and the styles ArmsAboveHead, Elated, Robot and Zombie.
 CLIPS: tuple[Clip, ...] = (
-    *(Clip("Neutral", gait, window) for gait in GAITS for window in range(2)),
-    *(
-        Clip(style, "FW")
-        for style in (
-            "Akimbo",
-            "ArmsAboveHead",
-            "Depressed",
-            "Elated",
-            "HandsInPockets",
-            "Old",
-            "Proud",
-            "Robot",
-            "Strutting",
-            "Zombie",
-        )
-    ),
+    Clip("Neutral", "FW", 807),
+    Clip("Neutral", "FW", 4140),
+    Clip("Akimbo", "FW", 384),
+    Clip("Depressed", "FW", 410),
+    Clip("HandsInPockets", "FW", 421),
+    Clip("Old", "FW", 513),
+    Clip("Proud", "FW", 497),
+    Clip("Strutting", "FW", 508),
+    Clip("Neutral", "SW", 354),
+    Clip("Neutral", "SW", 2160),
+    Clip("Neutral", "SW", 2700),
+    Clip("Neutral", "BW", 4440),
 )
 
 #: MyoFullBody body -> the BVH joint it follows, then its (position, orientation) costs
@@ -249,8 +240,9 @@ def retarget(
     # The model upstream's MyoFullBody task builds: no finger joints.
     model = myofullbody.compiled_model()
     source, _ = load_soma_bvh_file(bvh)
-    stride = round(1.0 / (FIT_FPS * _frame_time(bvh)))
-    source = source[frames][::stride]
+    if frames.stop is not None and frames.stop > len(source):
+        raise ValueError(f"{bvh} has {len(source)} frames, not {frames.stop}")
+    source = source[frames][:: BVH_FPS // FIT_FPS]
 
     config = _CACHE / "ik_config.json"
     config.parent.mkdir(parents=True, exist_ok=True)
@@ -317,24 +309,16 @@ def retarget(
 
 
 def archive() -> Path:
-    """A directory laid out as the archive's ``100STYLE/``, with :data:`CUTS` and
-    :data:`CLIPS`' BVHs: the one ``MJSWAN_100STYLE_ROOT`` points at, else the cache,
-    filled from Zenodo."""
+    """A directory laid out as the archive's ``100STYLE/``, with :data:`CLIPS`' BVHs:
+    the one ``MJSWAN_100STYLE_ROOT`` points at, else the cache, filled from Zenodo."""
     configured = os.getenv(ROOT_ENV_VAR)
     if configured:
         return Path(configured).expanduser().resolve()
     root = _CACHE / "bvh"
-    wanted = {CUTS, *(clip.bvh for clip in CLIPS)}
+    wanted = {clip.bvh for clip in CLIPS}
     if any(not (root / path).exists() for path in wanted):
         _fetch(root, wanted)
     return root
-
-
-def _cut(root: Path, clip: Clip) -> tuple[int, int]:
-    """The frames the clip's capture starts and stops at."""
-    with (root / CUTS).open(newline="") as f:
-        row = next(r for r in csv.DictReader(f) if r["STYLE_NAME"] == clip.style)
-    return int(row[f"{clip.gait}_START"]), int(row[f"{clip.gait}_STOP"])
 
 
 def _fetch(root: Path, wanted: set[str]) -> None:
@@ -371,14 +355,8 @@ def ensure_clips(*, mshuman700: bool) -> list[Path]:
         stem = clip.name.replace("/", "_")
         myofullbody = _CACHE / "myofullbody" / f"{stem}.npz"
         if not myofullbody.exists():
-            root = archive()
-            bvh = root / clip.bvh
-            length = round(CLIP_SECONDS / _frame_time(bvh))
-            first, last = _cut(root, clip)
-            start = first + clip.window * length
-            if start + length > last:
-                raise ValueError(f"{clip.name} runs past the end of its capture")
-            residual = retarget(bvh, myofullbody, slice(start, start + length))
+            frames = slice(clip.start, clip.start + round(CLIP_SECONDS * BVH_FPS))
+            residual = retarget(archive() / clip.bvh, myofullbody, frames)
             worst = max(residual, key=lambda body: residual[body].max())
             print(
                 f"{clip.name}: onto MyoFullBody, {100 * residual[worst].max():.1f} cm "
@@ -410,11 +388,3 @@ def ensure_clips(*, mshuman700: bool) -> list[Path]:
             )
         paths.append(target)
     return paths
-
-
-def _frame_time(bvh: Path) -> float:
-    with bvh.open() as f:
-        for line in f:
-            if line.strip().startswith("Frame Time:"):
-                return float(line.split(":")[1])
-    raise ValueError(f"{bvh} has no frame time")
