@@ -503,8 +503,8 @@ PREVIEWS: dict[str, Preview | tuple[Preview, ...]] = {
             )
         ),
     ),
-    # A strut, a hunched walk and a sidestep, each picked in the motion picker and
-    # filmed for 5 s from its first frame (each clip is 8 s long).
+    # A hunched walk, one with the hands clasped behind and a sidestep, each picked in the
+    # motion picker and filmed for 5 s from its first frame (each clip is 8 s long).
     "msm": tuple(
         Preview(
             scene=scene,
@@ -515,9 +515,9 @@ PREVIEWS: dict[str, Preview | tuple[Preview, ...]] = {
             seconds=5.0,
         )
         for scene, motion in (
-            ("ms_human_700", "Strutting/FW_8s"),
-            ("myofullbody", "Old/FW_9s"),
-            ("ms_human_700", "Neutral/SW_36s"),
+            ("ms_human_700", "Old/FW_9s"),
+            ("myofullbody", "ArmsBehindBack/FW_7s"),
+            ("ms_human_700", "Neutral/SW_6s"),
         )
     ),
 }

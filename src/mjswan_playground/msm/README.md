@@ -18,10 +18,10 @@ CC BY 4.0), retargeted here with MuscleMimic's GMR fork
 
 Two whole-body musculoskeletal humans, each driven by its own SuperMimic policy, setting
 the excitation of every muscle at 100 Hz to track motion-capture clips. The viewer's
-motion picker lists twelve 8 s clips of 100STYLE under three groups: walking forward
-(the neutral style twice, and Akimbo, Depressed, HandsInPockets, Old, Proud and
-Strutting), walking sideways (three) and walking backward (one), each named by its style,
-its gait and where it starts in its BVH. A clip plays from its first frame, in
+motion picker lists twelve 8 s clips of 100STYLE under two groups: walking forward (the
+neutral style twice, and ArmsBehindBack, ArmsBySide, Depressed, DuckFoot, HandsInPockets,
+LookUp, Monk, Old and PigeonToed) and walking sideways (the neutral style), each named by
+its style, its gait and where it starts in its BVH. A clip plays from its first frame, in
 the state upstream's reset writes, and starts over after its last. Its reference is drawn
 as upstream's demo draws it, a translucent blue ghost at the clip's own place; nothing
 the policy reads places the body relative to it, so the body drifts from it as a clip
@@ -128,13 +128,15 @@ rows stand for 100STYLE's.
 - **The clips are 100STYLE's, not upstream's.** Upstream trains and demos on AMASS KIT
   clips, whose license allows no redistribution, so the build retargets 100STYLE's
   instead (`style100.py`), clips the policies never saw in training:
-  - Only twelve clips are kept, those both policies track to their end in the browser.
-    The policies learned on KIT walks, at 0.4 to 0.7 m/s and backwards only in straight
-    lines, while 100STYLE's actor crosses a 4.5 m square and turns at its edges. So a
-    clip starts where the dataset's `Frame_Cuts.csv` says its capture does, or inside a
-    stretch where the hips turn slower than 60°/s. Left out, each ending on a deviation
-    within its 8 s: the runs (1 to 1.3 m/s), the backward and sideways walks through a
-    turn, and the styles ArmsAboveHead, Elated, Robot and Zombie.
+  - Twelve clips are kept: those both policies play from their reset to their end in the
+    browser, and on through the clip's restart, with no termination but the clip's end.
+    The policies learned on KIT walks at 0.4 to 0.7 m/s, and backwards only in straight
+    lines, while 100STYLE's actor crosses a 4.5 m square and turns at its edges. Each
+    clip starts where the dataset's `Frame_Cuts.csv` says its capture does, but the
+    neutral forward walk's, 8 s on and at 69 s, where it turns least. Of the other clips
+    tried, these each end on a deviation within their 8 s: the runs (1 to 1.3 m/s), the
+    backward walks and the other sideways ones, and the forward walks of Akimbo,
+    ArmsAboveHead, ArmsFolded, Elated, OnPhoneRight, Proud, Robot, Strutting and Zombie.
   - GMR fits MyoFullBody to each BVH frame at 30 fps with gmr_plus's IK costs for SOMA's
     BVH onto MyoFullBody. The scales and offsets are made from the two rest poses rather
     than tuned: 100STYLE's T-pose and MyoFullBody in gmr_plus's (both shoulders

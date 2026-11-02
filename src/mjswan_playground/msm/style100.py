@@ -50,7 +50,7 @@ def notice(*, mshuman700: bool) -> str:
 
 
 #: 100STYLE's gait codes -> the motion picker's groups.
-GAITS = {"FW": "Walk forward", "BW": "Walk backward", "SW": "Walk sideways"}
+GAITS = {"FW": "Walk forward", "SW": "Walk sideways"}
 #: How long each clip is, in seconds.
 CLIP_SECONDS = 8.0
 #: 100STYLE's frame rate.
@@ -78,27 +78,27 @@ class Clip:
         return f"{self.style}/{self.style}_{self.gait}.bvh"
 
 
-#: The clips the policies track to their end in the browser. The policies learned on KIT
-#: walks, at 0.4 to 0.7 m/s and backwards only in straight lines. 100STYLE's actor
-#: crosses a 4.5 m square, turning at its edges, so a clip starts where ``Frame_Cuts.csv``
-#: says the capture does, or inside a stretch where the hips turn slower than 60 deg/s.
-#: Left out, each failing on a deviation: the runs (1 to 1.3 m/s), the backward and
-#: sideways walks through a turn, and the styles ArmsAboveHead, Elated, Robot and Zombie.
+#: The clips both policies play from their reset to their end in the browser with no
+#: termination but the clip's end. Each starts where ``Frame_Cuts.csv`` says its capture
+#: does, but the neutral forward walk's, 8 s on and at 69 s, where it turns least. The
+#: policies learned on KIT walks at 0.4 to 0.7 m/s, and backwards only in straight lines,
+#: so each of these ends on a deviation: the runs (1 to 1.3 m/s), the backward walks and
+#: the other sideways ones, which 100STYLE's actor takes through turns at the edges of a
+#: 4.5 m square, and the forward walks of Akimbo, ArmsAboveHead, ArmsFolded, Elated,
+#: OnPhoneRight, Proud, Robot, Strutting and Zombie.
 CLIPS: tuple[Clip, ...] = (
     Clip("Neutral", "FW", 807),
     Clip("Neutral", "FW", 4140),
-    Clip("Depressed", "FW", 410),
-    Clip("HandsInPockets", "FW", 421),
-    Clip("Old", "FW", 513),
-    Clip("Neutral", "SW", 354),
-    Clip("ArmsBySide", "FW", 350),
     Clip("ArmsBehindBack", "FW", 433),
-    Clip("ArmsFolded", "FW", 392),
+    Clip("ArmsBySide", "FW", 350),
+    Clip("Depressed", "FW", 410),
+    Clip("DuckFoot", "FW", 635),
+    Clip("HandsInPockets", "FW", 421),
     Clip("LookUp", "FW", 411),
     Clip("Monk", "FW", 450),
-    Clip("OnPhoneRight", "FW", 400),
+    Clip("Old", "FW", 513),
     Clip("PigeonToed", "FW", 563),
-    Clip("DuckFoot", "FW", 635),
+    Clip("Neutral", "SW", 354),
 )
 
 #: MyoFullBody body -> the BVH joint it follows, then its (position, orientation) costs
