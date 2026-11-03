@@ -13,7 +13,7 @@ from mjlab.managers.termination_manager import TerminationTermCfg
 from mjlab.scene import Scene
 from mjlab.tasks.registry import load_env_cfg
 
-from . import terms, upstream
+from . import style100, terms, upstream
 
 #: Scene name -> the body it runs.
 SCENES = {"MS-Human-700": upstream.MS_HUMAN_700, "MyoFullBody": upstream.MYOFULLBODY}
@@ -93,6 +93,12 @@ def setup_builder(part: str | None = None) -> mjswan.Builder:
         body = SCENES[name]
         env_cfg, onnx_path, clips, joint_names = play_env_cfg(body, root)
         scene = project.add_scene_mjlab(body.task_id, name=name, env_cfg=env_cfg)
+        scene.add_attribution(
+            "100style",
+            license="CC-BY-4.0",
+            copyright="Ian Mason",
+            notice=style100.notice(mshuman700=body is upstream.MS_HUMAN_700),
+        )
         policy = scene.add_policy(
             Path(body.checkpoint).stem,
             onnx.load(onnx_path),

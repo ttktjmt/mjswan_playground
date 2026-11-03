@@ -40,10 +40,17 @@ def _head(repo: Path) -> str:
 
 
 def ensure_repo(
-    *, name: str, url: str, commit: str, marker: str, root_env_var: str | None = None
+    *,
+    name: str,
+    url: str,
+    commit: str,
+    marker: str,
+    root_env_var: str | None = None,
+    paths: tuple[str, ...] = (),
 ) -> Path:
     """Return a checkout of ``url`` at ``commit``, fetching into the cache if needed, or
-    whatever ``root_env_var`` points at if ``marker`` is present there."""
+    whatever ``root_env_var`` points at if ``marker`` is present there. ``paths`` limits
+    the checkout to those directories, for an upstream whose other files are large."""
     configured = os.getenv(root_env_var) if root_env_var else None
     if configured:
         root = Path(configured).expanduser().resolve()
@@ -58,11 +65,15 @@ def ensure_repo(
     if not (repo / ".git").exists():
         repo.mkdir(parents=True, exist_ok=True)
         _git(["init", "-q"], cwd=repo)
+        if paths:
+            _git(["sparse-checkout", "set", *paths], cwd=repo)
     elif _head(repo) == commit:
         # Already parked on the pinned commit: fetching would only add a network
         # round-trip, and would fail a build that could have run offline.
         return repo
     # --depth 1: some upstreams' history is many times the size of their files.
-    _git(["fetch", "--depth", "1", url, commit], cwd=repo)
+    # A sparse checkout fetches no blob outside its paths.
+    fetch = ["fetch", "--depth", "1", *(["--filter=blob:none"] if paths else [])]
+    _git([*fetch, url, commit], cwd=repo)
     _git(["checkout", "--detach", commit], cwd=repo)
     return repo

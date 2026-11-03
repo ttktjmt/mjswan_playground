@@ -30,8 +30,19 @@ musclemimic = [
 orcs = ["onnxruntime", "usd-core>=26.8"]
 # MyoFullBody's model for the msm task, which runs muscle-supermimic from a checkout;
 # mjswan's hf extra fetches its checkpoints, and onnxruntime checks the policies it
-# converts against upstream's own.
-msm = ["musclemimic-models==1.0.6", "mjswan[hf]", "onnxruntime"]
+# converts against upstream's own; tqdm shows the 100STYLE download. The rest is what
+# the GMR checkout that retargets its clips imports.
+msm = [
+    "musclemimic-models==1.0.6",
+    "mjswan[hf]",
+    "onnxruntime",
+    "tqdm",
+    "mink>=0.0.13",
+    "qpsolvers[daqp]",
+    "imageio",
+    "loop-rate-limiters>=1.2.0",
+    "rich",
+]
 spinkick = ["spinkick-example"]
 # Registers myosuite's waypoint task and TERRA's helpers, and reads the TERRA-4B Orbax
 # checkpoint; only the terra task needs it.

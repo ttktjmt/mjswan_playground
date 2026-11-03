@@ -4,9 +4,9 @@ Upstream's policy is a motion encoder over the reference alone and a decoder ove
 body's state. The encoder's input depends on nothing the body does, so its latent is
 evaluated here for every frame of the clips, as upstream's own browser demo does
 (``export_web.py``), and the browser runs the decoder alone. Both come from the Hub
-checkpoint. The clips are rebuilt from the demo's files in upstream's git, since the
-dataset they were retargeted from is gated, each into an mjlab motion ``.npz`` that also
-carries its frames' latents.
+checkpoint. The clips are 100STYLE's (:mod:`.style100`), not the AMASS ones upstream's
+demo ships, whose license allows no redistribution: each becomes an mjlab motion
+``.npz`` that also carries its frames' latents.
 """
 
 from __future__ import annotations
@@ -16,14 +16,14 @@ import gzip
 import importlib
 import json
 import os
-import re
 import sys
-import tempfile
 from pathlib import Path
 
 import numpy as np
 
 from mjswan_playground._deps import CACHE_DIR, ensure_repo
+
+from . import style100
 
 REPO_URL = "https://github.com/kaibohex/muscle-supermimic"
 REPO_COMMIT = "d73bbcb866da83bef186a730547ab09ecb96bd3d"
@@ -35,22 +35,8 @@ TASK_PACKAGE = "muscle_supermimic.tasks"
 POLICY_REPO_ID = "Beanpow/muscle-supermimic"
 POLICY_REVISION = "d3fdd54eedea09411f5c9750ff59a61996febc9f"
 
-#: The control rate, which the demo's clips are sampled at.
+#: The control rate, which the motions are sampled at.
 FPS = 100
-#: The demo's clip menu groups (``main.mjs``'s ``KINDS``): the first match names a clip's.
-KINDS = (
-    (r"WalkingStraightForward|/walking_?\d|walking_forward", "Walk forward"),
-    (r"Backwards", "Walk backward"),
-    (r"walking_slow", "Walk slowly"),
-    (r"walking_medium", "Walk at a medium pace"),
-    (r"walking_fast", "Walk fast"),
-    (r"walking_run", "Run"),
-    (r"LeftTurn|turn_left", "Turn left"),
-    (r"RightTurn|turn_right", "Turn right"),
-    (r"CounterClockwise", "Walk a counter-clockwise circle"),
-    (r"Clockwise", "Walk a clockwise circle"),
-    (r"support|handrail", "Walk with a support"),
-)
 
 _CACHE = CACHE_DIR / "msm"
 
@@ -79,7 +65,6 @@ MYOFULLBODY = Body(
 @dataclasses.dataclass(frozen=True)
 class Clip:
     name: str
-    """Upstream's, without its ``_poses`` suffix."""
     group: str
     path: Path
     """An mjlab motion ``.npz`` with the per-frame arrays :data:`FRAME_FIELDS` too."""
@@ -121,32 +106,25 @@ def register_tasks(root: Path) -> None:
 
 
 def ensure_policy(body: Body, root: Path, env_cfg: object) -> tuple[Path, list[Clip]]:
-    """The decoder as ONNX, and the demo's clips as motions, converted once into the
+    """The decoder as ONNX, and the 100STYLE clips as motions, converted once into the
     cache."""
-    demo = root / "docs" / "website" / "demo" / "data" / body.key
-    meta = json.loads((demo / "meta.json").read_text())
     onnx_path = _CACHE / body.key / f"{Path(body.checkpoint).stem}.onnx"
-    clips = []
-    for clip in meta["clips"]:
-        name = clip["name"].removesuffix("_poses")
-        group = next(label for pattern, label in KINDS if re.search(pattern, name))
-        path = _CACHE / body.key / "motions" / f"{name.replace('/', '_')}.npz"
-        clips.append(Clip(name, group, path))
+    clips = [
+        Clip(
+            clip.name,
+            clip.group,
+            _CACHE / body.key / "motions" / f"{clip.name.replace('/', '_')}.npz",
+        )
+        for clip in style100.CLIPS
+    ]
     if not (onnx_path.exists() and all(clip.path.exists() for clip in clips)):
-        _convert(body, demo, meta, env_cfg, onnx_path, clips)
+        _convert(body, root, env_cfg, onnx_path, clips)
     return onnx_path, clips
-
-
-def _frames(demo: Path, meta: dict, clip: dict) -> np.ndarray:
-    """One clip's frames: per frame the latent, then the reference qpos."""
-    raw = gzip.decompress((demo / clip["file"]).read_bytes())
-    return np.frombuffer(raw, "<f4").reshape(clip["length"], meta["frame_width"])
 
 
 def _convert(
     body: Body,
-    demo: Path,
-    meta: dict,
+    root: Path,
     env_cfg: object,
     onnx_path: Path,
     clips: list[Clip],
@@ -164,20 +142,15 @@ def _convert(
         store_fp16,
     )
 
+    # Only the decoder check below reads upstream's demo.
+    demo = root / "docs" / "website" / "demo" / "data" / body.key
+    meta = json.loads((demo / "meta.json").read_text())
     command = env_cfg.commands["motion"]
     model = env_cfg.scene.entities["robot"].spec_fn().compile()
     kin = SkeletonKinematics(command.body_names, "cpu", model)
 
-    # Each clip as upstream's MuscleMimic trajectory format at the control rate, which
-    # MotionLib reads back frame for frame.
-    joint_names = np.array([kin.info.root_joint_name, *kin.info.joint_names])
-    with tempfile.TemporaryDirectory() as tmp:
-        files = []
-        for k, clip in enumerate(meta["clips"]):
-            qpos = _frames(demo, meta, clip)[:, meta["nz"] :].astype(np.float64)
-            files.append(str(Path(tmp) / f"{k}.npz"))
-            np.savez(files[-1], qpos=qpos, joint_names=joint_names, frequency=FPS)
-        motion = MotionLib(files, kin, 1.0 / FPS, "cpu")
+    sources = style100.ensure_clips(mshuman700=body is MS_HUMAN_700)
+    motion = MotionLib([str(path) for path in sources], kin, 1.0 / FPS, "cpu")
     heads = TrackingHeads(kin, motion, None, command.lookahead, command.stride)
 
     checkpoint = torch.load(
@@ -199,12 +172,6 @@ def _convert(
     with torch.no_grad():
         goal = heads.goal(StepCtx((), torch.arange(motion.num_frames)))
         latent = torch.tanh(policy.enc(policy.goal_norm(goal))).numpy()
-    shipped = np.concatenate(
-        [_frames(demo, meta, c)[:, : meta["nz"]] for c in meta["clips"]]
-    )
-    error = float(np.abs(latent - shipped).max())
-    if error > 1e-3:
-        raise RuntimeError(f"The latents disagree with upstream's demo by {error:.2e}")
 
     # Upstream's own export, weight matrices stored as float16 as its demo ships them.
     round_weights_fp16(policy)
@@ -244,14 +211,12 @@ def _convert(
         onnx_path.unlink()
         raise RuntimeError(f"The decoder disagrees with upstream's demo by {error:.2e}")
 
-    init = np.fromfile(demo / meta["files"]["init"], "<f8")
-    init = init.reshape(len(clips), meta["nq"] + meta["nv"])
     # Their rows in the motion, which skips the world body.
     tracked = np.array([model.body(name).id - 1 for name in command.body_names])
     for k, clip in enumerate(clips):
         start, n = int(motion.clip_start[k]), int(motion.clip_len[k])
         frames = slice(start, start + n)
-        motion_npz = _replay(model, kin, motion, frames, init[k])
+        motion_npz = _replay(model, kin, motion, frames)
         error = np.abs(
             motion_npz["body_pos_w"][:, tracked] - motion.body_p[frames].numpy()
         ).max()
@@ -274,24 +239,23 @@ def _replay(
     kin: object,
     motion: object,
     frames: slice,
-    init: np.ndarray,
 ) -> dict[str, np.ndarray]:
     """One clip as ``mjlab.scripts.csv_to_npz`` writes it: each frame's state set and
     every body of the entity recorded. The state is upstream's reference, velocities
-    included, and at the first frame the state upstream's reset writes (``init.bin``)."""
+    included, and at the first frame the state upstream's reset writes
+    (``MotionCommand.write_reference_state``): the joints clamped to their ranges."""
     import mujoco
     import torch
     from muscle_supermimic.utils.rotations import mat_to_quat
 
     root_R = motion.root_R[frames] @ kin.R_off.T
-    q, qd = kin.full_joint_state(motion.q[frames], motion.qd[frames])
+    joints = motion.q[frames].clone()
+    joints[0] = torch.clamp(joints[0], kin.q_lo, kin.q_hi)
+    q, qd = kin.full_joint_state(joints, motion.qd[frames])
     # The free joint's qvel holds the angular velocity in the root's own frame.
     w = (root_R.transpose(-1, -2) @ motion.root_w[frames].unsqueeze(-1)).squeeze(-1)
     qpos = torch.cat([motion.root_p[frames], mat_to_quat(root_R), q], -1).numpy()
     qvel = torch.cat([motion.root_v[frames], w, qd], -1).numpy()
-    if np.abs(np.concatenate([qpos[0], qvel[0]]) - init).max() > 1e-4:
-        raise RuntimeError("The first frame is not the state upstream's reset writes")
-    qpos[0], qvel[0] = init[: model.nq], init[model.nq :]
 
     data = mujoco.MjData(model)
     bodies = slice(1, model.nbody)
