@@ -13,10 +13,21 @@ from mjlab.managers.termination_manager import TerminationTermCfg
 from mjlab.scene import Scene
 from mjlab.tasks.registry import load_env_cfg
 
+from mjswan_playground._deps import license_file
+
 from . import style100, terms, upstream
 
 #: Scene name -> the body it runs.
 SCENES = {"MS-Human-700": upstream.MS_HUMAN_700, "MyoFullBody": upstream.MYOFULLBODY}
+
+#: The checkpoints state no license, so each scene carries where its policy comes from.
+WEIGHTS_NOTICE = """\
+The policy: {checkpoint}
+from https://huggingface.co/{repo_id} at {revision}.
+Its decoder is exported to ONNX with float16 weights, as upstream's browser demo ships it.
+muscle-supermimic: https://github.com/kaibohex/muscle-supermimic.
+The model card states no license and calls the checkpoints private.
+"""
 
 #: Parts built on their own for mjswan Cloud, which takes 100 MB where the whole uploads
 #: 179 MB: one body each.
@@ -93,6 +104,24 @@ def setup_builder(part: str | None = None) -> mjswan.Builder:
         body = SCENES[name]
         env_cfg, onnx_path, clips, joint_names = play_env_cfg(body, root)
         scene = project.add_scene_mjlab(body.task_id, name=name, env_cfg=env_cfg)
+        if body is upstream.MYOFULLBODY:
+            scene.add_attribution(
+                "musclemimic_models",
+                license=license_file("musclemimic_models", "LICENSE"),
+                notice=license_file("musclemimic_models", "NOTICE"),
+            )
+        # The code the scene's graphs and decoder are made from.
+        scene.add_attribution(
+            "muscle-supermimic", license=root / "LICENSE", notice=root / "NOTICE"
+        )
+        scene.add_attribution(
+            "muscle-supermimic-checkpoint",
+            notice=WEIGHTS_NOTICE.format(
+                checkpoint=body.checkpoint,
+                repo_id=upstream.POLICY_REPO_ID,
+                revision=upstream.POLICY_REVISION[:7],
+            ),
+        )
         scene.add_attribution(
             "100style",
             license="CC-BY-4.0",

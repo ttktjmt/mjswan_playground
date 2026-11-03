@@ -4,7 +4,6 @@ TERRA-4B checkpoint. See ``README.md``."""
 from __future__ import annotations
 
 import re
-from importlib.metadata import distribution
 from typing import Any
 
 import mjswan
@@ -26,6 +25,8 @@ from myosuite.envs.myo.backends.mjlab.mjlab_task_builder import (
 from myosuite.envs.myo.backends.mjlab.tasks.cpu_reference import mujoco_cfg_from_model
 from myosuite.integrations.musclemimic.fullbody_model import TERRAIN_GROUP
 
+from mjswan_playground._deps import license_file
+
 from . import terms, upstream
 from .terms import ENTITY
 
@@ -39,14 +40,6 @@ Merkourios Simos, Chengkun Li, Bianca Ziliotto, Alexander Mathis. TERRA: Terrain
 Reconstruction, Retargeting and Control for Musculoskeletal Locomotion.
 arXiv:2609.38653, 2026. The model card states no license.
 """
-
-
-def _license_file(package: str, name: str) -> Any:
-    return next(
-        f
-        for f in distribution(package).files
-        if f.match(f"*.dist-info/licenses/{name}")
-    ).locate()
 
 
 def _entity_spec(route: upstream.Route) -> mujoco.MjSpec:
@@ -144,7 +137,7 @@ def setup_builder() -> mjswan.Builder:
     policy = onnx.load(str(onnx_path))
     builder = mjswan.Builder()
     project = builder.add_project(
-        name="TERRA", license=_license_file("myosuite", "LICENSE")
+        name="TERRA", license=license_file("myosuite", "LICENSE")
     )
     for route in upstream.routes():
         scene = project.add_scene_mjlab(
@@ -153,8 +146,8 @@ def setup_builder() -> mjswan.Builder:
         scene.add_policy("TERRA-4B", policy)
         scene.add_attribution(
             "musclemimic_models",
-            license=_license_file("musclemimic_models", "LICENSE"),
-            notice=_license_file("musclemimic_models", "NOTICE"),
+            license=license_file("musclemimic_models", "LICENSE"),
+            notice=license_file("musclemimic_models", "NOTICE"),
         )
         scene.add_attribution("terra-4b", notice=WEIGHTS_NOTICE)
     return builder
