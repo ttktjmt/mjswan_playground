@@ -1,6 +1,5 @@
 """``style100._fetch`` takes the BVHs it is asked for out of the Zenodo archive, only once
-the archive matches the checksum the record lists, and never waits on a stalled
-connection longer than ``TIMEOUT``."""
+the archive matches the checksum the record lists, and gives every request ``TIMEOUT``."""
 
 import hashlib
 import io
