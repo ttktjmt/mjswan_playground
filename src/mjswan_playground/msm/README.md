@@ -182,8 +182,17 @@ The code is Apache-2.0, and MS-Human-700 and `musclemimic-models` are too, but:
 
 - The checkpoints state no license; the model card calls them private.
 - MyoFullBody's arm and hand derive from MoBL-ARMS, released for non-commercial use only.
-- The clips are 100STYLE's, CC BY 4.0: each scene carries `LICENSE.100style` and a
-  `NOTICE.100style` that credits the dataset and says how the clips were changed.
-  gmr_plus, which retargets them, is MIT and runs at build time only.
+- The clips are 100STYLE's, CC BY 4.0. gmr_plus, which retargets them, is MIT and runs
+  at build time only.
+
+Each scene carries, as `LICENSE.<component>` and `NOTICE.<component>`:
+
+| Component | Files | For |
+|---|---|---|
+| `muscle-supermimic` | upstream's `LICENSE` (Apache-2.0) and `NOTICE` | the code the scene's graphs and decoder are made from |
+| `muscle-supermimic-checkpoint` | a `NOTICE` | where the policy comes from, and that its model card states no license |
+| `100style` | the CC BY 4.0 text, and a `NOTICE` | the credit and how the clips were changed |
+| `musclemimic_models` | the package's `LICENSE` (Apache-2.0) and `NOTICE`, MyoFullBody's scene only | the body, its `NOTICE` saying the arm and hand are for non-commercial use only |
+| `MS-Human-700` | upstream's `LICENSE` (Apache-2.0), MS-Human-700's scene only, found beside the model | the body |
 
 So the task stays off this repository's site, and only its author publishes it.

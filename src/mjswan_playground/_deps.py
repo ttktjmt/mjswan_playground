@@ -1,10 +1,12 @@
-"""Pinned checkouts of the repositories the tasks pull their assets from. They land in
-``.cache/`` at the repo root, so a checkout stays self-contained."""
+"""Pinned checkouts of the repositories the tasks pull their assets from, and the license
+files of the packages they build with. Checkouts land in ``.cache/`` at the repo root, so
+a checkout stays self-contained."""
 
 from __future__ import annotations
 
 import os
 import subprocess
+from importlib.metadata import distribution
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -77,3 +79,14 @@ def ensure_repo(
     _git([*fetch, url, commit], cwd=repo)
     _git(["checkout", "--detach", commit], cwd=repo)
     return repo
+
+
+def license_file(package: str, name: str) -> Path:
+    """The file ``name`` under the ``licenses/`` of an installed package's dist-info."""
+    return Path(
+        next(
+            f
+            for f in distribution(package).files
+            if f.match(f"*.dist-info/licenses/{name}")
+        ).locate()
+    )
