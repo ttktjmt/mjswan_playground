@@ -64,10 +64,6 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/mjswan_playground"]
 
-[tool.hatch.build.targets.sdist]
-# Keeps the README's preview GIFs (~50 MB) off PyPI.
-only-include = ["src"]
-
 [tool.uv.sources]
 # TERRA's code is only on feat/programmatic-waypoint-tasks; move to main once it merges.
 myosuite = { git = "https://github.com/MyoHub/myosuite", rev = "992bd58928e61d3f7ce27a033be02d0be18a2c18" }
