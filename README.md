@@ -32,7 +32,11 @@ A collection of tasks built with [mjswan](https://github.com/ttktjmt/mjswan).
 
 ## CLI
 
+Clone the repository and run the CLI with [uv](https://docs.astral.sh/uv/):
+
 ```
+git clone https://github.com/ttktjmt/mjswan_playground
+cd mjswan_playground
 uv run msp <subcommand>
 ```
 
@@ -43,15 +47,9 @@ uv run msp <subcommand>
 | `build <task-id>` | Build a task without launching | `--output-dir` |
 | `site [<task-id>...]` | Build every task on the GitHub Pages site into one app | `--no-build`, `--base-path` (`/`), `--dist-dir` (`dist`), `--output-dir` (`dist/_site`) |
 
-Run a task in the browser without installing anything:
-
-```
-uvx mjswan-playground run <task-id>
-```
-
 ## Python
 
-mjswan_playground can be imported as a Python package, and each task's builder can be used to build and launch the demo:
+Within the clone, mjswan_playground can be imported as a Python package, and each task's builder can be used to build and launch the demo:
 
 ```python
 import mjswan_playground
