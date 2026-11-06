@@ -32,11 +32,7 @@ A collection of tasks built with [mjswan](https://github.com/ttktjmt/mjswan).
 
 ## CLI
 
-Clone the repository and run the CLI with [uv](https://docs.astral.sh/uv/):
-
 ```
-git clone https://github.com/ttktjmt/mjswan_playground
-cd mjswan_playground
 uv run msp <subcommand>
 ```
 
