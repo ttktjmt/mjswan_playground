@@ -56,8 +56,8 @@ splits it into two uploads, one body each, built by their own IDs
 
 | Part | Scene | Upload | On mjswan Cloud |
 |---|---|---:|---|
-| `msm-mshuman` | MS-Human-700 | 65 MB | not yet |
-| `msm-myofullbody` | MyoFullBody | 53 MB | not yet |
+| `msm-mshuman` | MS-Human-700 | 65 MB | [mjswan.com/s/pCsbf6n](https://mjswan.com/s/pCsbf6n) |
+| `msm-myofullbody` | MyoFullBody | 53 MB | [mjswan.com/s/JZgNkby](https://mjswan.com/s/JZgNkby) |
 
 | Policy | Upstream task | Checkpoint |
 |---|---|---|
