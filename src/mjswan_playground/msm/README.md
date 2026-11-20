@@ -7,8 +7,11 @@ Source: https://github.com/kaibohex/muscle-supermimic/tree/d73bbcb866da83bef186a
 policies from https://huggingface.co/Beanpow/muscle-supermimic (no license stated) ·
 MS-Human-700 from https://github.com/LNSGroup/MS-Human-700 (Apache-2.0) ·
 MyoFullBody from `musclemimic-models` 1.0.6 (Apache-2.0, its arm and hand
-non-commercial) · clips: [100STYLE](https://ianxmason.github.io/100style/) (Ian Mason,
-CC BY 4.0), retargeted here with MuscleMimic's GMR fork
+non-commercial) · muscle atlas:
+[myosuite-assets](https://huggingface.co/datasets/myohub/myosuite-assets/tree/afa8427188c8bd054925200c70db6757908dee45)
+(MyoSuite, CC BY 4.0, on BodyParts3D © DBCLS) · clips:
+[100STYLE](https://ianxmason.github.io/100style/) (Ian Mason, CC BY 4.0), retargeted
+here with MuscleMimic's GMR fork
 [gmr_plus](https://github.com/amathislab/gmr_plus/tree/1b4eb9864360fa822b1290f34592da6393a4d496)
 (MIT), see [License](#license) · project page: https://muscle-supermimic.beanpow.top/
 
@@ -32,6 +35,9 @@ goes on.
 | MS-Human-700 | MS-Human-700 with locked hands: 33 joint DoF, 694 muscles | `model_016000` |
 | MyoFullBody | MuscleMimic's MyoFullBody, fingers disabled: 31 joint DoF, 354 muscles | `model_016000` |
 
+MyoFullBody wears MyoSuite's muscle atlas, 416 meshes skinned to its bones, in place of
+the tendons, over bones in MyoSuite's ivory. The Skin menu's None takes the atlas off.
+
 ## Run
 
 ```sh
@@ -50,14 +56,14 @@ and retargets each clip, onto MyoFullBody and from there onto MS-Human-700. The 
 is 1.5 GB, of which the clips' BVHs are 76 MB. The clips take 33 MB and 34 MB of the
 build; the browser fetches one when it is picked.
 
-The whole build uploads 118 MB, over the 100 MB that mjswan Cloud takes, so `PARTS`
+The whole build uploads 128 MB, over the 100 MB that mjswan Cloud takes, so `PARTS`
 splits it into two uploads, one body each, built by their own IDs
 (`uv run msp build msm-mshuman`):
 
 | Part | Scene | Upload | On mjswan Cloud |
 |---|---|---:|---|
 | `msm-mshuman` | MS-Human-700 | 65 MB | [mjswan.com/s/pCsbf6n](https://mjswan.com/s/pCsbf6n) |
-| `msm-myofullbody` | MyoFullBody | 53 MB | [mjswan.com/s/JZgNkby](https://mjswan.com/s/JZgNkby) |
+| `msm-myofullbody` | MyoFullBody | 63 MB | [mjswan.com/s/JZgNkby](https://mjswan.com/s/JZgNkby) |
 
 | Policy | Upstream task | Checkpoint |
 |---|---|---|
@@ -184,6 +190,8 @@ The code is Apache-2.0, and MS-Human-700 and `musclemimic-models` are too, but:
 - MyoFullBody's arm and hand derive from MoBL-ARMS, released for non-commercial use only.
 - The clips are 100STYLE's, CC BY 4.0. gmr_plus, which retargets them, is MIT and runs
   at build time only.
+- MyoFullBody's muscle atlas is MyoSuite's, on BodyParts3D (© DBCLS), both CC BY 4.0,
+  bundled unchanged.
 
 Each scene carries, as `LICENSE.<component>` and `NOTICE.<component>`:
 
@@ -193,6 +201,7 @@ Each scene carries, as `LICENSE.<component>` and `NOTICE.<component>`:
 | `muscle-supermimic-checkpoint` | a `NOTICE` | where the policy comes from, and that its model card states no license |
 | `100style` | the CC BY 4.0 text, and a `NOTICE` | the credit and how the clips were changed |
 | `musclemimic_models` | the package's `LICENSE` (Apache-2.0) and `NOTICE`, MyoFullBody's scene only | the body, its `NOTICE` saying the arm and hand are for non-commercial use only |
+| `skin-muscles` | the CC BY 4.0 text, and a `NOTICE`, MyoFullBody's scene only | the muscle atlas: the credit, and how MyoSuite changed it |
 | `MS-Human-700` | upstream's `LICENSE` (Apache-2.0), MS-Human-700's scene only, found beside the model | the body |
 
 So the task stays off this repository's site, and only its author publishes it.
