@@ -1296,7 +1296,7 @@ wheels = [
 
 [[package]]
 name = "mjswan"
-version = "0.12.11"
+version = "0.13.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "mujoco" },
@@ -1305,9 +1305,9 @@ dependencies = [
     { name = "rich" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c8/81/4ae0854dae739ee59f986aa0dbf530715e3ffc068f89f68800623a56bcfa/mjswan-0.12.11.tar.gz", hash = "sha256:4712d914e4e497683c56bb6eb0e594cc60815af16defd7fc50aaa69bfe9168c9", size = 11716737, upload-time = "2026-11-06T14:22:16.646Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/eb/1f/7e1b59aaed9a93f13e7cc8478e4e2d2fe19fd7cc62a4da3402737d10cfc4/mjswan-0.13.1.tar.gz", hash = "sha256:c1349e01c564d9df2479b72ed432acbe8edad15657dee0b4f4159543e899765f", size = 6326443, upload-time = "2026-11-19T08:54:21.26Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c5/6e/bfb612a498789fc0a070fd73ad97e5322d78a9c24e24ad7de79fe931f135/mjswan-0.12.11-py3-none-any.whl", hash = "sha256:30306b5d3e2b4e40134ac42af40f80450fd223c170353157d7d58ce6ca1d0cf0", size = 11975966, upload-time = "2026-11-06T14:22:13.297Z" },
+    { url = "https://files.pythonhosted.org/packages/30/ba/564c5028485439feae44351eb8e607e5910bba76b7208f7089d456493cf7/mjswan-0.13.1-py3-none-any.whl", hash = "sha256:64992b06332f86d05997824d7d6f085f03b59d6129e4de65188bbcc0380e9e1a", size = 6501762, upload-time = "2026-11-19T08:54:19.083Z" },
 ]
 
 [package.optional-dependencies]
@@ -1375,7 +1375,7 @@ requires-dist = [
     { name = "loop-rate-limiters", marker = "extra == 'msm'", specifier = ">=1.2.0" },
     { name = "mink", marker = "extra == 'msm'", specifier = ">=0.0.13" },
     { name = "mjlab", specifier = "==1.6.0" },
-    { name = "mjswan", specifier = ">=0.12.11" },
+    { name = "mjswan", specifier = ">=0.13.1" },
     { name = "mjswan", extras = ["hf"], marker = "extra == 'msm'" },
     { name = "musclemimic-models", marker = "extra == 'msm'", specifier = "==1.0.6" },
     { name = "myosuite", extras = ["musclemimic"], marker = "extra == 'musclemimic'", git = "https://github.com/MyoHub/myosuite?rev=992bd58928e61d3f7ce27a033be02d0be18a2c18" },
