@@ -43,8 +43,9 @@ msm = [
     "loop-rate-limiters>=1.2.0",
     "rich",
 ]
-# mjswan's hf extra fetches the reaf task's policies from the Hub.
-reaf = ["mjswan[hf]"]
+# mjswan's hf extra fetches the reaf task's policies from the Hub; onnxruntime runs them
+# in reaf/check.py.
+reaf = ["mjswan[hf]", "onnxruntime"]
 spinkick = ["spinkick-example"]
 # Registers myosuite's waypoint task and TERRA's helpers, and reads the TERRA-4B Orbax
 # checkpoint; only the terra task needs it.

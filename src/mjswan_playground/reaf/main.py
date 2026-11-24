@@ -5,13 +5,22 @@ from __future__ import annotations
 
 import mjswan
 
-from . import so101_pick_cube, so101_pick_cube_vision
+from . import (
+    cartpole_balance,
+    cartpole_balance_vision,
+    cartpole_swing_up,
+    so101_pick_cube,
+    so101_pick_cube_vision,
+)
 
 #: One part per environment, built on its own for mjswan Cloud and embedded in its own
 #: section of reaf-sim's docs; the whole lists them in this order.
 PARTS = {
     "reaf-so101-pick-cube": so101_pick_cube.add_scenes,
     "reaf-so101-pick-cube-vision": so101_pick_cube_vision.add_scenes,
+    "reaf-cartpole-balance": cartpole_balance.add_scenes,
+    "reaf-cartpole-swing-up": cartpole_swing_up.add_scenes,
+    "reaf-cartpole-balance-vision": cartpole_balance_vision.add_scenes,
 }
 
 

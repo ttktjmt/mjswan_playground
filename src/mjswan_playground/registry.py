@@ -49,7 +49,13 @@ _PARTS: dict[str, str] = {
     "orcs-open": "mjswan_playground.orcs.main",
     **dict.fromkeys(("msm-mshuman", "msm-myofullbody"), "mjswan_playground.msm.main"),
     **dict.fromkeys(
-        ("reaf-so101-pick-cube", "reaf-so101-pick-cube-vision"),
+        (
+            "reaf-so101-pick-cube",
+            "reaf-so101-pick-cube-vision",
+            "reaf-cartpole-balance",
+            "reaf-cartpole-swing-up",
+            "reaf-cartpole-balance-vision",
+        ),
         "mjswan_playground.reaf.main",
     ),
 }

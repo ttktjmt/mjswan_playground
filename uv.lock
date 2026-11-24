@@ -1350,6 +1350,7 @@ orcs = [
 ]
 reaf = [
     { name = "mjswan", extra = ["hf"] },
+    { name = "onnxruntime" },
 ]
 spinkick = [
     { name = "spinkick-example" },
@@ -1387,6 +1388,7 @@ requires-dist = [
     { name = "onnx", specifier = ">=1.20.0" },
     { name = "onnxruntime", marker = "extra == 'msm'" },
     { name = "onnxruntime", marker = "extra == 'orcs'" },
+    { name = "onnxruntime", marker = "extra == 'reaf'" },
     { name = "orbax-checkpoint", marker = "extra == 'musclemimic'", specifier = ">=0.11" },
     { name = "orbax-checkpoint", marker = "extra == 'terra'", specifier = ">=0.11" },
     { name = "pyyaml", specifier = ">=6.0" },

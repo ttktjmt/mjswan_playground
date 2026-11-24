@@ -26,9 +26,9 @@ newest. A repository holds one environment's run, named in its `run.json`.
   policy.onnx     the actor in one file, its observation normalizer included
   contract.json   what the policy reads and drives, in order, for the mjswan port
   reference.npz   a deterministic rollout (no observation noise, no domain randomization,
-                  no latency): each step's qpos, qvel, mocap_pos, ctrl, observations and
-                  action, and each camera frame, so the port's observations can be checked
-                  against Playground's numbers
+                  no latency): each step's qpos, qvel, mocap_pos, ctrl, observations,
+                  action and whether the episode ended, and each camera frame, so the
+                  port can be checked against Playground's numbers (reaf/check.py)
 
     python train.py setup
     python train.py all --env CartpoleBalance --out cartpole --hf-repo user/cartpole-balance
@@ -630,7 +630,16 @@ def export(args: argparse.Namespace) -> None:
     motion_steps = _motion_steps(env)
     record: dict[str, list] = {
         key: []
-        for key in ("qpos", "qvel", "mocap_pos", "ctrl", "obs", *images, "action")
+        for key in (
+            "qpos",
+            "qvel",
+            "mocap_pos",
+            "ctrl",
+            "obs",
+            *images,
+            "action",
+            "done",
+        )
     }
     if motion_steps is not None:
         record["motion_step"] = []
@@ -652,19 +661,18 @@ def export(args: argparse.Namespace) -> None:
         if motion_steps is not None:
             record["motion_step"].append(int(motion_steps[0]))
         record["action"].append(_numpy(action)[0])
-        obs, _, _, _ = env.step(action)
+        obs, _, dones, _ = env.step(action)
+        record["done"].append(bool(dones[0]))
+
+    def dtype(key: str):
+        if key.endswith("_frame"):
+            return np.uint8
+        if key in images:
+            return np.float32
+        return {"done": np.bool_, "motion_step": np.int64}.get(key, np.float64)
+
     arrays = {
-        key: np.asarray(
-            values,
-            dtype=np.uint8
-            if key.endswith("_frame")
-            else np.int64
-            if key == "motion_step"
-            else np.float32
-            if key in images
-            else np.float64,
-        )
-        for key, values in record.items()
+        key: np.asarray(values, dtype=dtype(key)) for key, values in record.items()
     }
     np.savez_compressed(export_dir / "reference.npz", **arrays)
 
