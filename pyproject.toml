@@ -43,6 +43,9 @@ msm = [
     "loop-rate-limiters>=1.2.0",
     "rich",
 ]
+# mjswan's hf extra fetches each environment's policy from the Hub; only the reaf task
+# needs it.
+reaf = ["mjswan[hf]"]
 spinkick = ["spinkick-example"]
 # Registers myosuite's waypoint task and TERRA's helpers, and reads the TERRA-4B Orbax
 # checkpoint; only the terra task needs it.

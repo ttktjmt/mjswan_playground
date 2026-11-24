@@ -25,6 +25,7 @@ _TASKS: dict[str, str] = {
     "orcs": "mjswan_playground.orcs.main",
     "pacman": "mjswan_playground.pacman.main",
     "parkour": "mjswan_playground.parkour.main",
+    "reaf": "mjswan_playground.reaf.main",
     "spinkick": "mjswan_playground.spinkick.main",
     "terra": "mjswan_playground.terra.main",
     "unitreerl": "mjswan_playground.unitreerl.main",
@@ -47,6 +48,10 @@ _PARTS: dict[str, str] = {
     **dict.fromkeys(("wuji-reorient", "wuji-penspin"), "mjswan_playground.wuji.main"),
     "orcs-open": "mjswan_playground.orcs.main",
     **dict.fromkeys(("msm-mshuman", "msm-myofullbody"), "mjswan_playground.msm.main"),
+    **dict.fromkeys(
+        ("reaf-so101-pick-cube", "reaf-so101-pick-cube-vision"),
+        "mjswan_playground.reaf.main",
+    ),
 }
 
 ALL_PARTS: tuple[str, ...] = tuple(_PARTS)
