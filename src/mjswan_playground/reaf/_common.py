@@ -38,7 +38,7 @@ def fetch(repo: tuple[str, str], path: str) -> Path:
 
 
 def _download(url: str, attempts: int = 5) -> bytes:
-    """A rate-limited answer is waited out and asked again, as long as it says to."""
+    """`url`'s body, waiting out a 429 or 503 for its Retry-After, else backing off."""
     for attempt in range(attempts):
         try:
             with urllib.request.urlopen(url, timeout=60) as response:  # noqa: S310

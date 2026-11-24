@@ -180,7 +180,7 @@ def _target_viz(cfg: LiftingCommandCfg) -> list[dict[str, Any]]:
     ]
 
 
-# mjswan leaves a command class that one task family uses to the port to register.
+# mjswan does not bind mjlab's `LiftingCommandCfg` itself; the port registers it.
 mjswan.register_command(
     "LiftingCommandCfg",
     mjswan.CommandBinding(

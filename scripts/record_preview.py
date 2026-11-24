@@ -769,9 +769,8 @@ _TELEMETRY = """(() => {
         const infer = rt.runOnnxInference.bind(rt);
         rt.runOnnxInference = (o) => (watch(), (obs = o), infer(o));
         const step = rt.executeSimulationSteps.bind(rt);
-        // mjswan 0.13 may run one control step's substeps over several calls, as
-        // `(from, to)`; dropped, each call would run the whole control step again. A
-        // control step counts once, at its last substep.
+        // mjswan 0.13 may split a control step's substeps over several `(from, to)`
+        // calls: pass them on, and count the step once, at its last substep.
         rt.executeSimulationSteps = (...a) => {
             const reset = step(...a);
             if (typeof a[1] === "number" && a[1] < rt.decimation) return reset;
