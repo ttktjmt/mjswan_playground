@@ -16,7 +16,6 @@ from mjlab.managers.observation_manager import ObservationGroupCfg, ObservationT
 from mjlab.managers.scene_entity_config import SceneEntityCfg
 from mjlab.sensor import CameraSensorCfg
 from mjlab.tasks.manipulation import mdp as lift_mdp
-from mjlab.utils.lab_api.math import matrix_from_quat
 
 from . import _pick_cube, _so101
 
@@ -73,17 +72,6 @@ class DeltaJointPositionAction(JointPositionAction):
         super().reset(env_ids)
         self._target[env_ids] = self._offset[env_ids]
         self._step[env_ids] = 0.0
-
-
-def _site_pos(env: Any, asset_cfg: SceneEntityCfg) -> torch.Tensor:
-    """A site's position in the world: Playground's `ee/xpos`."""
-    return env.scene[asset_cfg.name].data.site_pos_w[:, asset_cfg.site_ids].squeeze(1)
-
-
-def _site_xmat(env: Any, asset_cfg: SceneEntityCfg) -> torch.Tensor:
-    """A site's orientation, its rotation matrix row by row: Playground's `ee/xmat`."""
-    quat = env.scene[asset_cfg.name].data.site_quat_w[:, asset_cfg.site_ids].squeeze(1)
-    return matrix_from_quat(quat).reshape(-1, 9)
 
 
 def _wrist_image(env: Any, sensor_name: str, size: int) -> torch.Tensor:
@@ -148,10 +136,10 @@ def env_cfg() -> ManagerBasedRlEnvCfg:
                 "joint_pos": ObservationTermCfg(func=mdp.joint_pos_rel),
                 "joint_vel": ObservationTermCfg(func=mdp.joint_vel_rel),
                 "ee_pos": ObservationTermCfg(
-                    func=_site_pos, params={"asset_cfg": gripper}
+                    func=_pick_cube.site_pos, params={"asset_cfg": gripper}
                 ),
                 "ee_orientation": ObservationTermCfg(
-                    func=_site_xmat, params={"asset_cfg": gripper}
+                    func=_pick_cube.site_xmat, params={"asset_cfg": gripper}
                 ),
                 "goal_position": ObservationTermCfg(
                     func=lift_mdp.target_position,

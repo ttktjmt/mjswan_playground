@@ -8,6 +8,7 @@ from typing import Any
 import mjswan
 import mujoco
 import numpy as np
+import torch
 from mjlab.actuator import XmlActuatorCfg
 from mjlab.entity import EntityArticulationInfoCfg, EntityCfg
 from mjlab.envs import ManagerBasedRlEnvCfg, mdp
@@ -19,6 +20,7 @@ from mjlab.scene import SceneCfg
 from mjlab.sim import MujocoCfg, SimulationCfg
 from mjlab.tasks.manipulation import mdp as lift_mdp
 from mjlab.tasks.manipulation.mdp import LiftingCommandCfg
+from mjlab.utils.lab_api.math import matrix_from_quat
 from mjlab.viewer import ViewerConfig
 
 from . import _so101
@@ -32,16 +34,17 @@ ACTION_SCALE = {
 }
 
 
-def _cube() -> mujoco.MjSpec:
-    """Playground's `primitive.cube`: 3 cm, 27 g, on a free joint."""
+def cube(half_size: float = 0.015) -> mujoco.MjSpec:
+    """Playground's `primitive.cube`, on a free joint: 3 cm by default, and 27 g at any
+    size, since Playground randomizes the size of the compiled cube."""
     spec = mujoco.MjSpec()
     body = spec.worldbody.add_body(name="cube")
     body.add_freejoint(name="cube_freejoint")
     body.add_geom(
         name="cube",
         type=mujoco.mjtGeom.mjGEOM_BOX,
-        size=[0.015, 0.015, 0.015],
-        density=1000.0,
+        size=[half_size] * 3,
+        mass=0.027,
         condim=3,
         friction=[1.0, 0.005, 0.0001],
         rgba=[0.0, 1.0, 0.0, 1.0],
@@ -50,6 +53,28 @@ def _cube() -> mujoco.MjSpec:
         solref=[0.01, 1.0],
     )
     return spec
+
+
+def site_pos(env: Any, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    """A site's position in the world: Playground's `ee/xpos`."""
+    return env.scene[asset_cfg.name].data.site_pos_w[:, asset_cfg.site_ids].squeeze(1)
+
+
+def site_xmat(env: Any, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    """A site's orientation, its rotation matrix row by row: Playground's `ee/xmat`."""
+    quat = env.scene[asset_cfg.name].data.site_quat_w[:, asset_cfg.site_ids].squeeze(1)
+    return matrix_from_quat(quat).reshape(-1, 9)
+
+
+def ee_to_object(env: Any, object_name: str, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    """Playground's `obs_ee_to_cube`: from the gripper to the object, in the world."""
+    return env.scene[object_name].data.root_link_pos_w - site_pos(env, asset_cfg)
+
+
+def object_to_goal(env: Any, object_name: str, command_name: str) -> torch.Tensor:
+    """Playground's `obs_cube_to_goal`: from the object to the target, in the world."""
+    target = env.command_manager.get_term(command_name).target_pos
+    return target - env.scene[object_name].data.root_link_pos_w
 
 
 def world(spec: mujoco.MjSpec) -> None:
@@ -80,7 +105,7 @@ def env_cfg() -> ManagerBasedRlEnvCfg:
                     ),
                 ),
                 "cube": EntityCfg(
-                    spec_fn=_cube,
+                    spec_fn=cube,
                     init_state=EntityCfg.InitialStateCfg(pos=(0.275, 0.0, 0.015)),
                 ),
             },

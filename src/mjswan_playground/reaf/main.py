@@ -11,6 +11,8 @@ from . import (
     cartpole_swing_up,
     so101_pick_cube,
     so101_pick_cube_vision,
+    trossen_pick_cube,
+    trossen_pick_cube_vision,
 )
 
 #: One part per environment, built on its own for mjswan Cloud and embedded in its own
@@ -21,6 +23,8 @@ PARTS = {
     "reaf-cartpole-balance": cartpole_balance.add_scenes,
     "reaf-cartpole-swing-up": cartpole_swing_up.add_scenes,
     "reaf-cartpole-balance-vision": cartpole_balance_vision.add_scenes,
+    "reaf-trossen-pick-cube": trossen_pick_cube.add_scenes,
+    "reaf-trossen-pick-cube-vision": trossen_pick_cube_vision.add_scenes,
 }
 
 

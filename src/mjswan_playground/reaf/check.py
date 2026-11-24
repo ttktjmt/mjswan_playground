@@ -8,6 +8,10 @@ observations must then be Playground's, the policy's actions on them Playground'
 the controls those actions give Playground's next ones. A camera's own frames are only
 reported, since each renderer draws its own: Playground's frame goes into the camera
 before the observations are taken, so they check what the scene makes of the pixels.
+
+Playground reads bodies and sites from the kinematics `mj_step` computes before its last
+physics substep moves the joints, so after the first step of an episode the check takes
+them one substep back too; the scene itself reads them where the joints are.
 """
 
 from __future__ import annotations
@@ -52,11 +56,13 @@ def _widths(joint_type: int) -> tuple[int, int]:
 
 
 def _match(name: str, names: list[str]) -> int:
-    """The index of the one name in `names` that is `name`, or ends with `/name`."""
+    """The index of the one name in `names` that is `name` or ends with it, after a `/`
+    or a `_`: a port may flatten Playground's `right/joint_0` to `right_joint_0`."""
+    flat = name.replace("/", "_")
     found = [
         i
         for i, other in enumerate(names)
-        if other == name or other.endswith(f"/{name}")
+        if (o := other.replace("/", "_")) == flat or o.endswith(f"_{flat}")
     ]
     if len(found) != 1:
         raise SystemExit(f"{name!r} matches {[names[i] for i in found]} in the scene.")
@@ -98,6 +104,21 @@ def _ctrl_map(contract: dict, model) -> tuple[np.ndarray, np.ndarray]:
     return np.arange(len(scene)), np.array(scene)
 
 
+def _stale_kinematics(env) -> None:
+    """Bodies and sites one physics substep back, the joints where they are."""
+    import mujoco
+    import torch
+
+    data, model = env.sim.data, env.sim.mj_model
+    qpos = data.qpos[0].clone()
+    stale = qpos.cpu().numpy().astype(np.float64)
+    qvel = data.qvel[0].cpu().numpy().astype(np.float64)
+    mujoco.mj_integratePos(model, stale, qvel, -model.opt.timestep)
+    data.qpos[0] = torch.as_tensor(stale, dtype=qpos.dtype, device=qpos.device)
+    env.sim.forward()
+    data.qpos[0] = qpos
+
+
 def _camera(env, ref) -> tuple[object, str | None]:
     """The scene's one camera and the reference's frames from Playground's, if any."""
     from mjlab.sensor import CameraSensor
@@ -111,9 +132,25 @@ def _camera(env, ref) -> tuple[object, str | None]:
     return cameras[0], frames[0]
 
 
-#: What a scene keeps beyond the joints, written from the reference each step: the
-#: target of a pick-cube task, the clip frame of a tracking task.
-SYNC: dict[str, Callable] = {}
+def _sync_target(env, ref, t: int) -> None:
+    """A pick-cube target: Playground's mocap cube, the scene's lifting command."""
+    import torch
+
+    target = env.command_manager.get_term("target").target_pos
+    value = ref["mocap_pos"][t][0]
+    target[0] = torch.as_tensor(value, dtype=target.dtype, device=target.device)
+
+
+#: What a scene keeps beyond the joints, written from the reference each step.
+SYNC: dict[str, Callable] = dict.fromkeys(
+    (
+        "SO101PickCube",
+        "SO101PickCubeVision",
+        "TrossenPickCube",
+        "TrossenPickCubeVision",
+    ),
+    _sync_target,
+)
 
 
 def check(env_id: str, export_dir: Path, in_keys: list[str] | None) -> bool:
@@ -163,7 +200,10 @@ def check(env_id: str, export_dir: Path, in_keys: list[str] | None) -> bool:
         data.qvel[0, torch.as_tensor(v)] = torch.as_tensor(
             ref["qvel"][t][pg_v], dtype=data.qvel.dtype
         )
-        env.sim.forward()
+        if fresh:
+            env.sim.forward()
+        else:
+            _stale_kinematics(env)
         if sync is not None:
             sync(env, ref, t)
         env.sim.sense()

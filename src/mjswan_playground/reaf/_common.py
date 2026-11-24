@@ -10,6 +10,7 @@ import time
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -71,10 +72,18 @@ def _fetch_mjcf(repo: tuple[str, str], path: str) -> Path:
     return xml_path
 
 
-def load(repo: tuple[str, str], path: str) -> mujoco.MjSpec:
+def load(
+    repo: tuple[str, str], path: str, edit: Callable[[str], str] | None = None
+) -> mujoco.MjSpec:
     """An MJCF with every mesh and texture path made absolute: once attached to another
-    spec, an asset keeps only its file name, and the build could not find the file."""
-    spec = mujoco.MjSpec.from_file(str(_fetch_mjcf(repo, path)))
+    spec, an asset keeps only its file name, and the build could not find the file.
+    `edit` rewrites the XML first, into a copy beside it."""
+    xml_path = _fetch_mjcf(repo, path)
+    if edit is not None:
+        edited = xml_path.with_name(f"{xml_path.stem}.edited{xml_path.suffix}")
+        edited.write_text(edit(xml_path.read_text()))
+        xml_path = edited
+    spec = mujoco.MjSpec.from_file(str(xml_path))
     base = spec.modelfiledir or ""
     for mesh in spec.meshes:
         if mesh.file:
