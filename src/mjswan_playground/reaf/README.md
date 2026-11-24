@@ -30,6 +30,16 @@ uv run msp run reaf-so101-pick-cube    # one of them
 The first build fetches the SO-101 from MuJoCo Menagerie at a pinned commit into
 `.cache/reaf/`, and each policy from the Hugging Face Hub at a pinned revision.
 
+## Train
+
+[`train.py`](train.py) trains any of Playground's environments with Playground's own
+environment and PPO settings and exports the policy its scene runs, with a contract and a
+reference rollout to check the scene against. It runs in Playground's environment
+(MuJoCo 4), not this package's.
+[`train.ipynb`](train.ipynb) runs it on a free Colab GPU and keeps every checkpoint on the
+Hugging Face Hub, so a run that outlasts a session resumes in the next one:
+[open it in Colab](https://colab.research.google.com/github/ttktjmt/mjswan_playground/blob/main/src/mjswan_playground/reaf/train.ipynb).
+
 | From | Used as |
 |---|---|
 | Playground `tasks/manipulation/pick_cube` | the cube, the target and when it moves, the observations, the action scale, the resets |
