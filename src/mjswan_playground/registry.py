@@ -57,6 +57,7 @@ _PARTS: dict[str, str] = {
             "reaf-cartpole-balance-vision",
             "reaf-trossen-pick-cube",
             "reaf-trossen-pick-cube-vision",
+            "reaf-g1-whole-body-tracking",
         ),
         "mjswan_playground.reaf.main",
     ),

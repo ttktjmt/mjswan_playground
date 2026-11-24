@@ -54,7 +54,7 @@ GRIPPER = SceneEntityCfg(
     "robot", joint_names=("right_right_carriage_joint", "right_left_carriage_joint")
 )
 EE = SceneEntityCfg("robot", site_names=("right_ee_gripper_link",))
-#: Playground randomizes the cube's half size between these while it trains.
+#: The middle of the half sizes Playground trains the cube on, 2 to 2.5 cm.
 CUBE_HALF_SIZE = 0.0225
 
 #: Playground's `furniture.aloha_table`, around Menagerie's ALOHA table meshes.

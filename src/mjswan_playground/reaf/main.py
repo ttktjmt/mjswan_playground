@@ -9,6 +9,7 @@ from . import (
     cartpole_balance,
     cartpole_balance_vision,
     cartpole_swing_up,
+    g1_whole_body_tracking,
     so101_pick_cube,
     so101_pick_cube_vision,
     trossen_pick_cube,
@@ -25,6 +26,7 @@ PARTS = {
     "reaf-cartpole-balance-vision": cartpole_balance_vision.add_scenes,
     "reaf-trossen-pick-cube": trossen_pick_cube.add_scenes,
     "reaf-trossen-pick-cube-vision": trossen_pick_cube_vision.add_scenes,
+    "reaf-g1-whole-body-tracking": g1_whole_body_tracking.add_scenes,
 }
 
 

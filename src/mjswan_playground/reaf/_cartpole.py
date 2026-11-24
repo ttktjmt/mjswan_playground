@@ -79,7 +79,7 @@ def env_cfg(*, swing_up: bool) -> ManagerBasedRlEnvCfg:
     and sine, and both velocities. The action is the motor's control, which MuJoCo clips
     to ±1. mjlab has no RK4, so the physics steps with `implicitfast`.
     """
-    # Balance starts near upright, Playground's uniform ranges; swing-up hanging down.
+    # Balance draws Playground's ranges about upright; swing-up its noise about hanging.
     cart_range = (-NOISE, NOISE) if swing_up else (-0.1, 0.1)
     hinge_range = (-NOISE, NOISE) if swing_up else (-0.034, 0.034)
     return ManagerBasedRlEnvCfg(

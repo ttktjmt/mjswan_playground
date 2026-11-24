@@ -141,6 +141,15 @@ def _sync_target(env, ref, t: int) -> None:
     target[0] = torch.as_tensor(value, dtype=target.dtype, device=target.device)
 
 
+def _sync_motion(env, ref, t: int) -> None:
+    """A tracking task's clip frame: Playground's, in the scene's motion command."""
+    env.command_manager.get_term("motion").time_steps[0] = int(ref["motion_step"][t])
+
+
+#: Terms Playground computes from velocities a substep old, which the check cannot take
+#: back as it does positions: reported, then fed to the policy as Playground's.
+STALE = {"G1WholeBodyTracking": ("base_lin_vel", "base_ang_vel")}
+
 #: What a scene keeps beyond the joints, written from the reference each step.
 SYNC: dict[str, Callable] = dict.fromkeys(
     (
@@ -150,7 +159,7 @@ SYNC: dict[str, Callable] = dict.fromkeys(
         "TrossenPickCubeVision",
     ),
     _sync_target,
-)
+) | {"G1WholeBodyTracking": _sync_motion}
 
 
 def check(env_id: str, export_dir: Path, in_keys: list[str] | None) -> bool:
@@ -177,6 +186,7 @@ def check(env_id: str, export_dir: Path, in_keys: list[str] | None) -> bool:
     low, high = model.actuator_ctrlrange[u].T
     limited = model.actuator_ctrllimited[u].astype(bool)
     sync = SYNC.get(env_id)
+    stale = STALE.get(env_id, ())
     data = env.sim.data
     camera, frame_key = _camera(env, ref)
 
@@ -222,20 +232,26 @@ def check(env_id: str, export_dir: Path, in_keys: list[str] | None) -> bool:
             if len(i.shape) > 2:
                 # A stacked image comes flattened, as the browser feeds it.
                 value = value.reshape(i.shape[1:])
-            feed[i.name] = value[None].astype(np.float32)
             if len(i.shape) > 2:
+                feed[i.name] = value[None].astype(np.float32)
                 gap = np.abs(value - ref[i.name][t]).max()
                 note(f"obs {key} (image)", float(gap))
                 continue
             # Playground's flat input is its 1-D groups side by side: here, one group.
+            value = value.copy()
             terms = env.observation_manager.active_terms[key]
             dims = env.observation_manager.group_obs_term_dim[key]
             offset = 0
             for name, width in zip(terms, (int(np.prod(d)) for d in dims)):
                 end = offset + width
                 gap = np.abs(value[offset:end] - ref["obs"][t][offset:end]).max()
-                note(f"obs {key}/{name}", float(gap))
+                if name in stale:
+                    note(f"obs {key}/{name}, one substep apart (reported only)", gap)
+                    value[offset:end] = ref["obs"][t][offset:end]
+                else:
+                    note(f"obs {key}/{name}", float(gap))
                 offset = end
+            feed[i.name] = value[None].astype(np.float32)
         action = session.run(None, feed)[0][0]
         note("action", float(np.abs(action - ref["action"][t]).max()))
 
