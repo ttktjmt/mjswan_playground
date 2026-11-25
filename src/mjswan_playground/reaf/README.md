@@ -7,7 +7,11 @@ built on [reaf-sim](https://github.com/google-deepmind/reaf-sim) (Apache-2.0) ·
 policies from [ttktjmt/so101-pick-cube](https://huggingface.co/ttktjmt/so101-pick-cube) and
 [ttktjmt/so101-pick-cube-vision](https://huggingface.co/ttktjmt/so101-pick-cube-vision),
 trained with mjswan's
-[`examples/train/so101_pick_cube.py`](https://github.com/ttktjmt/mjswan/blob/main/examples/train/so101_pick_cube.py) ·
+[`examples/train/so101_pick_cube.py`](https://github.com/ttktjmt/mjswan/blob/main/examples/train/so101_pick_cube.py),
+and [ttktjmt/cartpole-balance](https://huggingface.co/ttktjmt/cartpole-balance),
+[ttktjmt/cartpole-swing-up](https://huggingface.co/ttktjmt/cartpole-swing-up) and
+[ttktjmt/cartpole-balance-vision](https://huggingface.co/ttktjmt/cartpole-balance-vision),
+trained with [`train.py`](train.py) ·
 the SO-101 (Apache-2.0), the Trossen WXAI, the ALOHA table and the Unitree G1
 (BSD-3-Clause) from [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) ·
 `G1WholeBodyTracking`'s clip is LAFAN1's `dance1_subject2` retargeted to the G1
@@ -21,12 +25,12 @@ that reaf-sim's documentation embeds on that environment's page.
 |---|---|---|
 | `SO101PickCube` | `reaf-so101-pick-cube` | The SO-101 lifts a cube to a target that moves every 4 to 7 s, reading where the cube is. |
 | `SO101PickCubeVision` | `reaf-so101-pick-cube-vision` | The same, finding the cube through its wrist camera, at 10 Hz. |
-| `CartpoleBalance` | `reaf-cartpole-balance` | A cart keeps a pole upright, from close to upright, at 100 Hz. No policy yet. |
-| `CartpoleSwingUp` | `reaf-cartpole-swing-up` | The cart swings the pole up from hanging down, then balances it. No policy yet. |
-| `CartpoleBalanceVision` | `reaf-cartpole-balance-vision` | Balancing from the last three grayscale frames of a fixed camera, at 50 Hz. No policy yet. |
-| `TrossenPickCube` | `reaf-trossen-pick-cube` | The Trossen WXAI's right arm lifts a cube on a table to a target that moves every 4 to 7 s, at 50 Hz. No policy yet. |
+| `CartpoleBalance` | `reaf-cartpole-balance` | A cart keeps a pole upright, from close to upright, at 100 Hz. |
+| `CartpoleSwingUp` | `reaf-cartpole-swing-up` | The cart swings the pole up from hanging down, then balances it. |
+| `CartpoleBalanceVision` | `reaf-cartpole-balance-vision` | Balancing from the last three grayscale frames of a fixed camera, at 50 Hz. |
+| `TrossenPickCube` | `reaf-trossen-pick-cube` | The Trossen WXAI's right arm lifts a cube on a table to a target that moves every 4 to 7 s, at 50 Hz. |
 | `TrossenPickCubeVision` | `reaf-trossen-pick-cube-vision` | The same, finding the cube through its wrist camera. No policy yet. |
-| `G1WholeBodyTracking` | `reaf-g1-whole-body-tracking` | The Unitree G1 dances a LAFAN1 clip with its whole body, from its first frame, at 50 Hz. No policy yet. |
+| `G1WholeBodyTracking` | `reaf-g1-whole-body-tracking` | The Unitree G1 dances a LAFAN1 clip with its whole body, from its first frame, at 50 Hz. |
 
 ## Run
 
@@ -54,6 +58,7 @@ without one.
 | Hub dataset `lvhaidong/LAFAN1_Retargeting_Dataset` at `ce15729` | `g1/dance1_subject2.csv` |
 | Hub `ttktjmt/so101-pick-cube` at `fcdf077` | `SO101PickCube`'s policy, trained on Playground 1.0.1 |
 | Hub `ttktjmt/so101-pick-cube-vision` at `c1b4d11` | `SO101PickCubeVision`'s policy, 1800 of its 3000 iterations |
+| Hub `ttktjmt/cartpole-balance` at `9a0d9f0`, `ttktjmt/cartpole-swing-up` at `75170d8`, `ttktjmt/cartpole-balance-vision` at `18888ec` | the cart-pole policies, trained on Playground 1.1.0 |
 
 ## Train and check
 
@@ -91,6 +96,11 @@ uv run --extra reaf python -m mjswan_playground.reaf.check \
   `right/joint_0`, since mjlab keeps only what follows an entity's last `/`.
 - **The cameras are drawn by three.js**, not Playground's ray tracer, so their shading
   differs from what the vision policies trained on.
+- **`CartpoleBalanceVision` stacks its frames in the policy.** mjswan 0.13.1 declares no
+  camera for an image term with history, so such a term never runs in the browser; the
+  scene observes the newest frame, and a graph around Playground's policy keeps the two
+  before it in `adapt_hx`, filled with the newest on an episode's first step, as
+  Playground's history is.
 - **The cart-pole steps with `implicitfast`**, not RK4, which mjlab does not offer, and its
   resets draw from uniform ranges with the deviation of Playground's normal ones.
 - **The G1's model is mjlab's**, which is Menagerie's `g1_mjlab.xml` that Playground loads,

@@ -29,8 +29,9 @@ OBS_TOLERANCE = 1e-4
 ACTION_TOLERANCE = 1e-3
 
 
-def _env_cfg(env_id: str) -> tuple[object, list[str] | None]:
-    """The scene's env config, and the in_keys its policy is added with."""
+def _env_cfg(env_id: str) -> tuple[object, dict]:
+    """The scene's env config, and what its policy is added with: in_keys, and for a
+    policy the scene builds itself, the model and out_keys."""
     import mjswan.project
 
     from . import main
@@ -46,8 +47,8 @@ def _env_cfg(env_id: str) -> tuple[object, list[str] | None]:
     if env_id not in scenes:
         raise SystemExit(f"No scene for {env_id}: {sorted(scenes)}")
     env_cfg, handle = scenes[env_id]
-    calls = handle.add_policy_hf.call_args_list
-    return env_cfg, calls[0].kwargs.get("in_keys") if calls else None
+    calls = handle.add_policy_hf.call_args_list + handle.add_policy.call_args_list
+    return env_cfg, calls[0].kwargs if calls else {}
 
 
 def _widths(joint_type: int) -> tuple[int, int]:
@@ -169,11 +170,20 @@ def check(env_id: str, export_dir: Path, in_keys: list[str] | None) -> bool:
 
     contract = json.loads((export_dir / "contract.json").read_text())
     ref = np.load(export_dir / "reference.npz")
-    session = onnxruntime.InferenceSession(str(export_dir / "policy.onnx"))
+    env_cfg, added = _env_cfg(env_id)
+    # A policy the scene builds itself (CartpoleBalanceVision's frame stack) is built
+    # from the Hub's; it is checked as the scene runs it.
+    model = added.get("policy")
+    source = (
+        model.SerializeToString() if model is not None else export_dir / "policy.onnx"
+    )
+    session = onnxruntime.InferenceSession(source if model is not None else str(source))
     inputs = session.get_inputs()
-
-    env_cfg, policy_in_keys = _env_cfg(env_id)
-    in_keys = in_keys or policy_in_keys or ["actor"]
+    out_keys = [
+        k if isinstance(k, str) else ",".join(k)
+        for k in added.get("out_keys") or ["action"]
+    ]
+    in_keys = in_keys or added.get("in_keys") or ["actor"]
     if len(in_keys) != len(inputs):
         raise SystemExit(
             f"policy.onnx takes {len(inputs)} inputs; in_keys is {in_keys}."
@@ -193,6 +203,7 @@ def check(env_id: str, export_dir: Path, in_keys: list[str] | None) -> bool:
     def clip(ctrl: np.ndarray) -> np.ndarray:
         return np.where(limited, np.clip(ctrl, low, high), ctrl)
 
+    images = [k for k in ref.files if ref[k].ndim == 4 and not k.endswith("_frame")]
     errors: dict[str, float] = {}
 
     def note(key: str, value: float) -> None:
@@ -227,14 +238,26 @@ def check(env_id: str, export_dir: Path, in_keys: list[str] | None) -> bool:
         obs = env.observation_manager.compute(update_history=True, env_ids=env_ids)
 
         feed = {}
+        if fresh:
+            carry = None
         for key, i in zip(in_keys, inputs):
+            if key == "is_init":
+                feed[i.name] = np.array([fresh])
+                continue
+            if key == "adapt_hx":
+                feed[i.name] = (
+                    carry if carry is not None else np.zeros(i.shape, np.float32)
+                )
+                continue
             value = obs[key][0].cpu().numpy()
             if len(i.shape) > 2:
                 # A stacked image comes flattened, as the browser feeds it.
                 value = value.reshape(i.shape[1:])
             if len(i.shape) > 2:
                 feed[i.name] = value[None].astype(np.float32)
-                gap = np.abs(value - ref[i.name][t]).max()
+                # Playground's image input; a stacked one ends with the newest frames.
+                image = ref[i.name] if i.name in ref.files else ref[images[0]]
+                gap = np.abs(value - image[t][-len(value) :]).max()
                 note(f"obs {key} (image)", float(gap))
                 continue
             # Playground's flat input is its 1-D groups side by side: here, one group.
@@ -252,7 +275,9 @@ def check(env_id: str, export_dir: Path, in_keys: list[str] | None) -> bool:
                     note(f"obs {key}/{name}", float(gap))
                 offset = end
             feed[i.name] = value[None].astype(np.float32)
-        action = session.run(None, feed)[0][0]
+        outputs = dict(zip(out_keys, session.run(None, feed)))
+        action = outputs["action"][0]
+        carry = outputs.get("next,adapt_hx")
         note("action", float(np.abs(action - ref["action"][t]).max()))
 
         env.action_manager.process_action(
