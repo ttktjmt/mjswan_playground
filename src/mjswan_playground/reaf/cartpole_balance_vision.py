@@ -42,12 +42,12 @@ def _fallen(env: Any) -> torch.Tensor:
     return (hinge.abs() > math.pi / 2) | (slider.abs() > 3.0)
 
 
-def env_cfg() -> ManagerBasedRlEnvCfg:
+def env_cfg(*, colors: bool = False) -> ManagerBasedRlEnvCfg:
     """`CartpoleBalance` at 50 Hz, seen through the fixed camera at 64 x 64 without
     shadows, and reset once the pole falls or 5 s pass. The observation is the newest
     frame; `stacked_policy` keeps the two before it. three.js draws the frames, not
     Playground's ray tracer, so their shading differs from what the policy trained on."""
-    cfg = _cartpole.env_cfg(swing_up=False)
+    cfg = _cartpole.env_cfg(swing_up=False, colors=colors)
     cfg.scene.sensors = (
         CameraSensorCfg(
             name="fixed",
@@ -134,9 +134,11 @@ def stacked_policy(policy: onnx.ModelProto) -> onnx.ModelProto:
     return model
 
 
-def add_scenes(project: mjswan.ProjectHandle) -> None:
+def add_scenes(project: mjswan.ProjectHandle, *, colors: bool = False) -> None:
     scene = project.add_scene_mjlab(
-        "CartpoleBalanceVision", name="CartpoleBalanceVision", env_cfg=env_cfg()
+        "CartpoleBalanceVision",
+        name="CartpoleBalanceVision",
+        env_cfg=env_cfg(colors=colors),
     )
     if POLICY is None:
         return

@@ -80,11 +80,9 @@ def _wrist_image(env: Any, sensor_name: str, size: int) -> torch.Tensor:
     return torch.nn.functional.interpolate(rgb, size=(size, size), mode="area")
 
 
-def _world(spec: mujoco.MjSpec) -> None:
-    """Playground's vision scene: a dim headlight, shadows from a key light on the
-    workspace and from the front fill, two room lights, and the arm, the cube and the
-    floor drawn in flat colour (`override_flat_materials`), the floor the SO-101's grey."""
-    _pick_cube.world(spec)
+def _light(spec: mujoco.MjSpec) -> None:
+    """Playground's vision lighting: a dim headlight, shadows from a key light on the
+    workspace and from the front fill, and two room lights."""
     center = spec.worldbody.add_body(name="workspace_center", pos=[0.25, 0.0, 0.0])
     key = spec.light("light")
     key.pos = [0.2, 0.0, 1.4]
@@ -105,20 +103,33 @@ def _world(spec: mujoco.MjSpec) -> None:
     fill.pos = [0.1, -1.0, 1.2]
     fill.diffuse = [0.35, 0.35, 0.35]
     fill.castshadow = True
+
+
+def _world(spec: mujoco.MjSpec) -> None:
+    """Playground's vision scene: its lights, and the arm, the cube and the floor drawn
+    in flat colour (`override_flat_materials`), the floor the SO-101's grey."""
+    _pick_cube.world(spec)
+    _light(spec)
     spec.geom("floor").rgba = [0.25, 0.25, 0.25, 1.0]
     for geom in spec.geoms:
         if geom.name == "floor" or geom.name.startswith(("robot/", "cube/")):
             geom.material = ""
 
 
-def env_cfg() -> ManagerBasedRlEnvCfg:
+def _colored_world(spec: mujoco.MjSpec) -> None:
+    """The vision scene's lights, with the arm and the floor in their own materials."""
+    _pick_cube.world(spec)
+    _light(spec)
+
+
+def env_cfg(*, colors: bool = False) -> ManagerBasedRlEnvCfg:
     """The policy sees the wrist camera's 64 x 64 frame averaged to 16 x 16, beside the
     joints, the gripper's pose and the target in the gripper's frame, and moves the arm
     by deltas at 10 Hz. The rest is `SO101PickCube`'s. three.js draws the frame, not
     Playground's ray tracer, so its shading differs from what the policy trained on."""
     cfg = _pick_cube.env_cfg()
     gripper = SceneEntityCfg("robot", site_names=("gripperframe",))
-    cfg.scene.spec_fn = _world
+    cfg.scene.spec_fn = _colored_world if colors else _world
     cfg.scene.sensors = (
         CameraSensorCfg(
             name="wrist_cam",
@@ -169,11 +180,11 @@ def env_cfg() -> ManagerBasedRlEnvCfg:
     return cfg
 
 
-def add_scenes(project: mjswan.ProjectHandle) -> None:
+def add_scenes(project: mjswan.ProjectHandle, *, colors: bool = False) -> None:
     _pick_cube.add_scene(
         project,
         "SO101PickCubeVision",
-        env_cfg=env_cfg(),
+        env_cfg=env_cfg(colors=colors),
         policy=POLICY,
         policy_name="PickCube Vision",
         in_keys=["actor", "camera"],

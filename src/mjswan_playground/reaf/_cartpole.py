@@ -65,6 +65,44 @@ CART = SceneEntityCfg("cartpole", joint_names=("slider",))
 HINGE = SceneEntityCfg("cartpole", joint_names=("hinge_1",))
 
 
+#: The DeepMind Control Suite's own look for its cart-pole, which Playground's model
+#: leaves out: `suite/common/materials.xml` and `skybox.xml`, and the geoms they colour.
+DM_CONTROL_ASSETS = """
+  <asset>
+    <texture name="skybox" type="skybox" builtin="gradient" rgb1=".4 .6 .8" rgb2="0 0 0"
+      width="800" height="800" mark="random" markrgb="1 1 1"/>
+    <texture name="grid" type="2d" builtin="checker" rgb1=".1 .2 .3" rgb2=".2 .3 .4"
+      width="300" height="300" mark="edge" markrgb=".2 .3 .4"/>
+    <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance=".2"/>
+    <material name="self" rgba=".7 .5 .3 1"/>
+    <material name="decoration" rgba=".3 .5 .7 1"/>
+  </asset>
+"""
+DM_CONTROL_MATERIALS = {
+    "floor": "grid",
+    "rail1": "decoration",
+    "rail2": "decoration",
+    "cart": "self",
+    "pole_1": "self",
+}
+
+
+def _colored_spec() -> mujoco.MjSpec:
+    xml = CARTPOLE_XML.replace("<worldbody>", DM_CONTROL_ASSETS + "\n  <worldbody>", 1)
+    spec = mujoco.MjSpec.from_string(xml)
+    for name, material in DM_CONTROL_MATERIALS.items():
+        spec.geom(name).material = material
+    spec.option = mujoco.MjSpec().option
+    return spec
+
+
+def _dm_control_headlight(spec: mujoco.MjSpec) -> None:
+    """`suite/common/visual.xml`'s headlight, which an entity's own would not carry."""
+    spec.visual.headlight.ambient = [0.4, 0.4, 0.4]
+    spec.visual.headlight.diffuse = [0.8, 0.8, 0.8]
+    spec.visual.headlight.specular = [0.1, 0.1, 0.1]
+
+
 def _spec() -> mujoco.MjSpec:
     spec = mujoco.MjSpec.from_string(CARTPOLE_XML)
     # mjlab sets the options from `SimulationCfg`; the model's would only conflict.
@@ -72,7 +110,7 @@ def _spec() -> mujoco.MjSpec:
     return spec
 
 
-def env_cfg(*, swing_up: bool) -> ManagerBasedRlEnvCfg:
+def env_cfg(*, swing_up: bool, colors: bool = False) -> ManagerBasedRlEnvCfg:
     """`CartpoleBalance`, or with `swing_up` `CartpoleSwingUp`, at Playground's 100 Hz.
 
     The observation is Playground's: the cart's position, the pole's angle as its cosine
@@ -86,7 +124,7 @@ def env_cfg(*, swing_up: bool) -> ManagerBasedRlEnvCfg:
         scene=SceneCfg(
             entities={
                 "cartpole": EntityCfg(
-                    spec_fn=_spec,
+                    spec_fn=_colored_spec if colors else _spec,
                     init_state=EntityCfg.InitialStateCfg(
                         joint_pos={
                             "slider": 0.0,
@@ -98,6 +136,7 @@ def env_cfg(*, swing_up: bool) -> ManagerBasedRlEnvCfg:
                     ),
                 )
             },
+            spec_fn=_dm_control_headlight if colors else None,
         ),
         observations={
             "actor": ObservationGroupCfg(
