@@ -13,7 +13,8 @@ POLICY: tuple[str, str] | None = (
 )
 
 
-def add_scenes(project: mjswan.ProjectHandle, *, colors: bool = False) -> None:
+def add_scenes(project: mjswan.ProjectHandle, *, colors: bool = True) -> None:
+    """In colour, as it is published on mjswan Cloud."""
     _cartpole.add_scene(
         project,
         "CartpoleBalance",

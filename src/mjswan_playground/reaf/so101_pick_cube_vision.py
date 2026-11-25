@@ -180,7 +180,8 @@ def env_cfg(*, colors: bool = False) -> ManagerBasedRlEnvCfg:
     return cfg
 
 
-def add_scenes(project: mjswan.ProjectHandle, *, colors: bool = False) -> None:
+def add_scenes(project: mjswan.ProjectHandle, *, colors: bool = True) -> None:
+    """In colour, as it is published on mjswan Cloud."""
     _pick_cube.add_scene(
         project,
         "SO101PickCubeVision",

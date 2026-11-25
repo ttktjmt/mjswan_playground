@@ -135,6 +135,7 @@ def stacked_policy(policy: onnx.ModelProto) -> onnx.ModelProto:
 
 
 def add_scenes(project: mjswan.ProjectHandle, *, colors: bool = False) -> None:
+    """In gray, as published: in colour the policy, trained on gray frames, fails."""
     scene = project.add_scene_mjlab(
         "CartpoleBalanceVision",
         name="CartpoleBalanceVision",
