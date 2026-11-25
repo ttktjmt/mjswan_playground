@@ -119,7 +119,7 @@ def add_scenes(project: mjswan.ProjectHandle) -> None:
     if POLICY is None:
         return
     repo, revision = POLICY
-    policy = scene.add_policy_hf(repo, revision=revision, name="Dance")
+    (policy,) = scene.add_policy_hf(repo, revision=revision, name="Dance")
     motion = cfg.commands["motion"]
     policy.add_motion(
         name=CLIP,

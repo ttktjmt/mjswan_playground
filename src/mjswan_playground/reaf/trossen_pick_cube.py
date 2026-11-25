@@ -7,9 +7,11 @@ import mjswan
 
 from . import _trossen
 
-#: The policy `train.py` trains on `TrossenPickCube`, as its repository and revision;
-#: None until it is on the Hub.
-POLICY: tuple[str, str] | None = None
+#: Trained by `train.py` on Playground 1.1.0's `TrossenPickCube`, all 1000 iterations.
+POLICY: tuple[str, str] | None = (
+    "ttktjmt/trossen-pick-cube",
+    "e0b52c5e5a94f4d416e75a4762df7fa889453b53",
+)
 
 
 def add_scenes(project: mjswan.ProjectHandle) -> None:

@@ -24,13 +24,14 @@ def _world(spec: mujoco.MjSpec) -> None:
         spec.geom(name).material = ""
 
 
-def env_cfg() -> ManagerBasedRlEnvCfg:
+def env_cfg(*, colors: bool = False) -> ManagerBasedRlEnvCfg:
     """The policy sees the wrist camera's 32 x 32 frame, collision geometry and the table
     without shadows or textures, beside the joints, the gripper's pose and the target in
     the gripper's frame. The rest is `TrossenPickCube`'s. three.js draws the frame, not
     Playground's ray tracer, so its shading differs from what the policy trained on."""
     cfg = _trossen.env_cfg()
-    cfg.scene.spec_fn = _world
+    # In colour, the tabletop and the floor keep their materials.
+    cfg.scene.spec_fn = _trossen.world if colors else _world
     cfg.scene.sensors = (
         CameraSensorCfg(
             name="wrist_cam",
@@ -75,11 +76,11 @@ def env_cfg() -> ManagerBasedRlEnvCfg:
     return cfg
 
 
-def add_scenes(project: mjswan.ProjectHandle) -> None:
+def add_scenes(project: mjswan.ProjectHandle, *, colors: bool = False) -> None:
     _trossen.add_scene(
         project,
         "TrossenPickCubeVision",
-        env_cfg=env_cfg(),
+        env_cfg=env_cfg(colors=colors),
         policy=POLICY,
         policy_name="PickCube Vision",
         in_keys=["actor", "camera"],
