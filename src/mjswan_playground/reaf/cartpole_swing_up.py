@@ -6,9 +6,11 @@ import mjswan
 
 from . import _cartpole
 
-#: The policy `train.py` trains on `CartpoleSwingUp`, as its repository and revision;
-#: None until it is on the Hub.
-POLICY: tuple[str, str] | None = None
+#: Trained by `train.py` on Playground 1.1.0's `CartpoleSwingUp`, all 200 iterations.
+POLICY: tuple[str, str] | None = (
+    "ttktjmt/cartpole-swing-up",
+    "75170d81600268afc1530a2126b6b8e44b3a873b",
+)
 
 
 def add_scenes(project: mjswan.ProjectHandle) -> None:
