@@ -274,6 +274,27 @@ def _make_deterministic(env_cfg) -> None:
                 processors.pop(name)
 
 
+def _override(cfg, overrides: str | None) -> None:
+    """`--overrides`, a dotted key reaching into nested settings, as in
+    `{"algorithm.learning_rate": 3e-4}`."""
+    import dataclasses
+
+    for key, value in json.loads(overrides or "{}").items():
+        *path, name = key.split(".")
+        target = cfg
+        for part in path:
+            if isinstance(target, dict):
+                target = target.get(part)
+            else:
+                target = getattr(target, part, None)
+        if isinstance(target, dict) and name in target:
+            target[name] = value
+        elif dataclasses.is_dataclass(target) and hasattr(target, name):
+            setattr(target, name, value)
+        else:
+            sys.exit(f"--overrides: there is no runner setting {key}.")
+
+
 def _build(args: argparse.Namespace, nworld: int, device: str, *, deterministic: bool):
     """Playground's own env for `--env`, built as its registry builds it."""
     from mujoco_playground._src.rl.rsl_rl import vecenv_wrapper
@@ -288,6 +309,7 @@ def _build(args: argparse.Namespace, nworld: int, device: str, *, deterministic:
     env_cfg.sim.impl = "warp"
     env = flat_scene.build_env(env_cfg)
     runner_cfg = entry.runner_cfg
+    _override(runner_cfg, args.overrides)
     runner_cfg.nworld = nworld
     if not device.startswith("cuda"):
         runner_cfg.torch_compile_mode = None
@@ -415,8 +437,6 @@ def train(args: argparse.Namespace) -> None:
     nworld = args.nworld or _nworld_for(device, defaults.nworld)
     print(f"Training {args.env} on {device} with {nworld} worlds, to {iterations}.")
     _, runner_cfg, env = _build(args, nworld, device, deterministic=False)
-    for key, value in json.loads(args.overrides or "{}").items():
-        setattr(runner_cfg, key, value)
     runner_cfg.seed = args.seed
 
     uploads: list[threading.Thread] = []
@@ -611,6 +631,8 @@ def export(args: argparse.Namespace) -> None:
         sys.exit("No checkpoint on disk or on the Hub: run `train` first.")
     export_dir = args.out / "export"
     export_dir.mkdir(parents=True, exist_ok=True)
+    # Written last, once the export is checked: `upload` takes no export without it.
+    (export_dir / "contract.json").unlink(missing_ok=True)
 
     device = _device()
     rng.seed(args.seed)
@@ -740,8 +762,8 @@ def upload(args: argparse.Namespace) -> None:
         print("No --hf-repo: nothing to upload. Everything is in", args.out)
         return
     export_dir = args.out / "export"
-    if not (export_dir / "policy.onnx").exists():
-        sys.exit("No export yet: run `export` first.")
+    if not (export_dir / "contract.json").exists():
+        sys.exit("No checked export: run `export` first.")
     api = _hub()
     api.create_repo(args.hf_repo, exist_ok=True)
     api.upload_folder(folder_path=str(export_dir), repo_id=args.hf_repo)
@@ -792,7 +814,8 @@ def main() -> None:
         )
         step.add_argument("--seed", type=int, default=0)
         step.add_argument(
-            "--overrides", help='runner settings as JSON, e.g. {"save_interval": 50}'
+            "--overrides",
+            help='runner settings as JSON, e.g. {"algorithm.learning_rate": 3e-4}',
         )
         step.add_argument(
             "--save-minutes",
