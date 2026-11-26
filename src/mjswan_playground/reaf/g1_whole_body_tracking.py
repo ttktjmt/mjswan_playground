@@ -1,8 +1,9 @@
-"""`G1WholeBodyTracking`: the Unitree G1 tracking a LAFAN1 dance with its whole body,
-BeyondMimic-style."""
+"""`G1WholeBodyTracking`: the Unitree G1 tracking a walk from 100STYLE with its whole
+body, BeyondMimic-style."""
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import mjswan
@@ -16,35 +17,34 @@ from mjswan_playground._deps import CACHE_DIR
 
 from ._common import MENAGERIE, fetch
 
-#: The policy `train.py` trains on `G1WholeBodyTracking` with `--motion dance1_subject2`,
-#: as its repository and revision; None until it is on the Hub.
+#: The policy `train.py` trains on `G1WholeBodyTracking` with
+#: `--motion 100style_neutral_fw`, as its repository and revision; None until it is on
+#: the Hub.
 POLICY: tuple[str, str] | None = None
-#: LAFAN1 retargeted to the G1, at the revision `train.py` takes its clips from.
-LAFAN1 = (
-    "lvhaidong/LAFAN1_Retargeting_Dataset",
-    "ce1572906efe6157840e8474d5a0d7aa87481e74",
+#: 100STYLE's neutral forward walk on the G1, from `retarget_100style.py`.
+CLIP = "100style_neutral_fw"
+CSV = Path(__file__).parent / "motions" / f"{CLIP}.csv"
+#: What CC BY 4.0 asks a copy of the clip to carry: the credit, and the changes.
+NOTICE = (
+    "The motion is from The 100STYLE Dataset - Ian Mason "
+    "(https://ianxmason.github.io/100style/), licensed under CC BY 4.0. It was cut to "
+    "20 s of the neutral forward walk, retargeted onto the Unitree G1 with GMR, and "
+    "resampled to 50 Hz."
 )
-CLIP = "dance1_subject2"
-#: The clip is CC BY-NC-ND 4.0, not the Apache-2.0 of the rest.
-LAFAN1_LICENSE = Path(__file__).parent / "LICENSE.lafan1"
 FPS = 50.0
 
 
-def motion_file(clip: str = CLIP) -> Path:
+def motion_file(csv: Path = CSV) -> Path:
     """The clip as Playground's `csv_to_npz` converts it, once: interpolated from 30 to
     50 fps, with every body's pose and velocity in the world, on mjlab's G1, which is
     Playground's (Menagerie's `g1_mjlab.xml`)."""
-    target = CACHE_DIR / "reaf" / "lafan1" / LAFAN1[1] / f"{clip}.npz"
+    digest = hashlib.sha256(csv.read_bytes()).hexdigest()[:12]
+    target = CACHE_DIR / "reaf" / "motions" / f"{csv.stem}-{digest}.npz"
     if target.exists():
         return target
-    from huggingface_hub import hf_hub_download
     from scipy.interpolate import interp1d
     from scipy.spatial.transform import Rotation, Slerp
 
-    repo, revision = LAFAN1
-    csv = hf_hub_download(
-        repo, f"g1/{clip}.csv", repo_type="dataset", revision=revision
-    )
     motion = np.loadtxt(csv, delimiter=",")
     t_in = np.linspace(0, (len(motion) - 1) / 30.0, len(motion))
     t_out = np.arange(0, t_in[-1], 1.0 / FPS)
@@ -115,14 +115,14 @@ def add_scenes(project: mjswan.ProjectHandle) -> None:
         "G1WholeBodyTracking", name="G1WholeBodyTracking", env_cfg=cfg
     )
     scene.add_attribution("unitree_g1", license=fetch(MENAGERIE, "unitree_g1/LICENSE"))
-    scene.add_attribution("lafan1", license=LAFAN1_LICENSE)
+    scene.add_attribution("100style", license="CC-BY-4.0", notice=NOTICE)
     if POLICY is None:
         return
     repo, revision = POLICY
-    (policy,) = scene.add_policy_hf(repo, revision=revision, name="Dance")
+    (policy,) = scene.add_policy_hf(repo, revision=revision, name="Walk")
     motion = cfg.commands["motion"]
     policy.add_motion(
-        name=CLIP,
+        name="Neutral walk",
         source=motion.motion_file,
         fps=FPS,
         anchor_body_name=motion.anchor_body_name,

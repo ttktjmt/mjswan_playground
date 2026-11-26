@@ -15,8 +15,9 @@ and [ttktjmt/cartpole-balance](https://huggingface.co/ttktjmt/cartpole-balance),
 trained with [`train.py`](train.py) ·
 the SO-101 (Apache-2.0), the Trossen WXAI, the ALOHA table and the Unitree G1
 (BSD-3-Clause) from [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) ·
-`G1WholeBodyTracking`'s clip is LAFAN1's `dance1_subject2` retargeted to the G1
-(**CC BY-NC-ND 4.0**, see [`LICENSE.lafan1`](LICENSE.lafan1))
+`G1WholeBodyTracking`'s clip is [100STYLE](https://ianxmason.github.io/100style/)'s
+neutral forward walk (Ian Mason, CC BY 4.0), retargeted to the G1 here, see
+[`motions/NOTICE.100style`](motions/NOTICE.100style)
 
 MuJoCo Playground's RL environments, one scene each, named after the environment's ID in
 Playground's `env_registry.py`. Each environment is also a part of its own, the build
@@ -31,7 +32,7 @@ that reaf-sim's documentation embeds on that environment's page.
 | `CartpoleBalanceVision` | `reaf-cartpole-balance-vision` | Balancing from the last three grayscale frames of a fixed camera, at 50 Hz. |
 | `TrossenPickCube` | `reaf-trossen-pick-cube` | The Trossen WXAI's right arm lifts a cube on a table to a target that moves every 4 to 7 s, at 50 Hz. |
 | `TrossenPickCubeVision` | `reaf-trossen-pick-cube-vision` | The same, finding the cube through its wrist camera. No policy yet. |
-| `G1WholeBodyTracking` | `reaf-g1-whole-body-tracking` | The Unitree G1 dances a LAFAN1 clip with its whole body, from its first frame, at 50 Hz. No policy yet. |
+| `G1WholeBodyTracking` | `reaf-g1-whole-body-tracking` | The Unitree G1 walks and turns as 100STYLE's actor does, tracking a 20 s clip with its whole body, at 50 Hz. No policy yet. |
 
 ## Run
 
@@ -41,10 +42,9 @@ uv run msp run reaf-so101-pick-cube    # one of them
 ```
 
 The first build fetches the robots and the table from MuJoCo Menagerie at a pinned commit into
-`.cache/reaf/`, each policy from the Hugging Face Hub at a pinned revision, and the LAFAN1
-clip from the Hub's LAFAN1 Retargeting Dataset at a pinned revision, converted as
-Playground's `csv_to_npz` converts it. A scene whose policy is not trained yet builds
-without one.
+`.cache/reaf/`, and each policy from the Hugging Face Hub at a pinned revision. The G1's
+clip is in [`motions/`](motions/), converted as Playground's `csv_to_npz` converts it. A
+scene whose policy is not trained yet builds without one.
 
 | From | Used as |
 |---|---|
@@ -56,7 +56,7 @@ without one.
 | Menagerie `robotstudio_so101` | the SO-101 |
 | Playground `tasks/whole_body/tracking` | the clip's conversion; the rest is mjlab's `Mjlab-Tracking-Flat-Unitree-G1`, which it restates |
 | Menagerie `trossen_wxai`, `aloha` | the bimanual WXAI, the table's meshes |
-| Hub dataset `lvhaidong/LAFAN1_Retargeting_Dataset` at `ce15729` | `g1/dance1_subject2.csv` |
+| 100STYLE (Zenodo record 8127870), `Neutral/Neutral_FW.bvh` | `motions/100style_neutral_fw.csv`, by [`retarget_100style.py`](retarget_100style.py) |
 | Hub `ttktjmt/so101-pick-cube` at `fcdf077` | `SO101PickCube`'s policy, trained on Playground 1.0.1 |
 | Hub `ttktjmt/so101-pick-cube-vision` at `c1b4d11` | `SO101PickCubeVision`'s policy, 1800 of its 3000 iterations |
 | Hub `ttktjmt/trossen-pick-cube` at `e0b52c5` | `TrossenPickCube`'s policy, all 1000 iterations on Playground 1.1.0 |
@@ -110,6 +110,10 @@ uv run --extra reaf python -m mjswan_playground.reaf.check \
   Playground's history is.
 - **The cart-pole steps with `implicitfast`**, not RK4, which mjlab does not offer, and its
   resets draw from uniform ranges with the deviation of Playground's normal ones.
+- **The G1 walks 100STYLE's neutral walk, not a LAFAN1 dance.** Playground's docs point at
+  LAFAN1's G1 retargeting, whose license (CC BY-NC-ND 4.0) allows no published changes;
+  [`retarget_100style.py`](retarget_100style.py) makes this clip with GMR, at 30 fps as
+  that dataset's are.
 - **The G1's model is mjlab's**, which is Menagerie's `g1_mjlab.xml` that Playground loads,
   with one more light.
 - **No domain randomization or observation noise**: both are training-only.
