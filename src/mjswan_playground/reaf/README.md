@@ -10,8 +10,9 @@ trained with mjswan's
 [`examples/train/so101_pick_cube.py`](https://github.com/ttktjmt/mjswan/blob/main/examples/train/so101_pick_cube.py),
 and [ttktjmt/cartpole-balance](https://huggingface.co/ttktjmt/cartpole-balance),
 [ttktjmt/cartpole-swing-up](https://huggingface.co/ttktjmt/cartpole-swing-up),
-[ttktjmt/cartpole-balance-vision](https://huggingface.co/ttktjmt/cartpole-balance-vision) and
-[ttktjmt/trossen-pick-cube](https://huggingface.co/ttktjmt/trossen-pick-cube),
+[ttktjmt/cartpole-balance-vision](https://huggingface.co/ttktjmt/cartpole-balance-vision),
+[ttktjmt/trossen-pick-cube](https://huggingface.co/ttktjmt/trossen-pick-cube) and
+[ttktjmt/trossen-pick-cube-vision](https://huggingface.co/ttktjmt/trossen-pick-cube-vision),
 trained with [`train.py`](train.py) ·
 the SO-101 (Apache-2.0), the Trossen WXAI, the ALOHA table and the Unitree G1
 (BSD-3-Clause) from [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) ·
@@ -31,7 +32,7 @@ that reaf-sim's documentation embeds on that environment's page.
 | `CartpoleSwingUp` | `reaf-cartpole-swing-up` | The cart swings the pole up from hanging down, then balances it. |
 | `CartpoleBalanceVision` | `reaf-cartpole-balance-vision` | Balancing from the last three grayscale frames of a fixed camera, at 50 Hz. |
 | `TrossenPickCube` | `reaf-trossen-pick-cube` | The Trossen WXAI's right arm lifts a cube on a table to a target that moves every 4 to 7 s, at 50 Hz. |
-| `TrossenPickCubeVision` | `reaf-trossen-pick-cube-vision` | The same, finding the cube through its wrist camera. No policy yet. |
+| `TrossenPickCubeVision` | `reaf-trossen-pick-cube-vision` | The same, finding the cube through its wrist camera. |
 | `G1WholeBodyTracking` | `reaf-g1-whole-body-tracking` | The Unitree G1 walks and turns as 100STYLE's actor does, tracking a 20 s clip with its whole body, at 50 Hz. No policy yet. |
 
 ## Run
@@ -60,6 +61,7 @@ scene whose policy is not trained yet builds without one.
 | Hub `ttktjmt/so101-pick-cube` at `fcdf077` | `SO101PickCube`'s policy, trained on Playground 1.0.1 |
 | Hub `ttktjmt/so101-pick-cube-vision` at `c1b4d11` | `SO101PickCubeVision`'s policy, 1800 of its 3000 iterations |
 | Hub `ttktjmt/trossen-pick-cube` at `e0b52c5` | `TrossenPickCube`'s policy, all 1000 iterations on Playground 1.1.0 |
+| Hub `ttktjmt/trossen-pick-cube-vision` at `8ca63be` | `TrossenPickCubeVision`'s policy, all 3000 iterations on Playground 1.1.0 |
 | Hub `ttktjmt/cartpole-balance` at `9a0d9f0`, `ttktjmt/cartpole-swing-up` at `75170d8`, `ttktjmt/cartpole-balance-vision` at `18888ec` | the cart-pole policies, trained on Playground 1.1.0 |
 
 ## Train and check

@@ -11,9 +11,12 @@ from mjlab.tasks.manipulation import mdp as lift_mdp
 
 from . import _pick_cube, _trossen
 
-#: The policy `train.py` trains on `TrossenPickCubeVision`, as its repository and
-#: revision; None until it is on the Hub.
-POLICY: tuple[str, str] | None = None
+#: Trained by `train.py` on Playground 1.1.0's `TrossenPickCubeVision`, all 3000
+#: iterations.
+POLICY: tuple[str, str] | None = (
+    "ttktjmt/trossen-pick-cube-vision",
+    "8ca63bea76fc56ebc89d39da462e0754acd42a66",
+)
 
 
 def _world(spec: mujoco.MjSpec) -> None:
@@ -77,6 +80,7 @@ def env_cfg(*, colors: bool = False) -> ManagerBasedRlEnvCfg:
 
 
 def add_scenes(project: mjswan.ProjectHandle, *, colors: bool = False) -> None:
+    """In gray, as published: in colour the policy, trained on flat colours, fails."""
     _trossen.add_scene(
         project,
         "TrossenPickCubeVision",
