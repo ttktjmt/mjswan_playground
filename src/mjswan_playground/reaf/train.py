@@ -18,8 +18,10 @@ from the newest checkpoint. A Colab session takes its disk with it when it ends,
 at least every --save-minutes, and a session that starts with none on disk takes the Hub's
 newest. A repository holds one environment's run, named in its `run.json`.
 
-`G1WholeBodyTracking` learns one clip of LAFAN1 retargeted to the G1, --motion, which
-`train` fetches from the Hub and converts with Playground's `csv_to_npz`.
+`G1WholeBodyTracking` learns one clip, --motion: by default 100STYLE's neutral walk as
+mjswan_playground's `reaf/retarget_100style.py` retargets it to the G1 (CC BY 4.0), else
+one of the LAFAN1 Retargeting Dataset's (CC BY-NC-ND 4.0, so not to be published), which
+`train` fetches and converts with Playground's `csv_to_npz`.
 
 `export` writes, under --out/export:
 
@@ -44,6 +46,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request
 from pathlib import Path
 
 PLAYGROUND = "1.1.0"
@@ -58,7 +61,18 @@ ENVS = (
     "G1WholeBodyTracking",
 )
 TRACKING = "G1WholeBodyTracking"
-#: LAFAN1 retargeted to the G1, at the revision the clips are taken from.
+#: Clips retargeted to the G1 in the LAFAN1 dataset's layout, at the commit they are
+#: taken from: name -> (URL, credit).
+CLIPS = {
+    "100style_neutral_fw": (
+        "https://raw.githubusercontent.com/ttktjmt/mjswan_playground/05683578317fc3a7bf4ae201b19975fb313b38f9/"
+        "src/mjswan_playground/reaf/motions/100style_neutral_fw.csv",
+        "100STYLE's neutral forward walk (Ian Mason, "
+        "https://ianxmason.github.io/100style/, CC BY 4.0), retargeted to the G1 by "
+        "mjswan_playground's `reaf/retarget_100style.py`",
+    ),
+}
+#: LAFAN1 retargeted to the G1, at the revision its clips are taken from.
 LAFAN1 = (
     "lvhaidong/LAFAN1_Retargeting_Dataset",
     "ce1572906efe6157840e8474d5a0d7aa87481e74",
@@ -178,13 +192,16 @@ def _identity(args: argparse.Namespace) -> dict:
 
 
 def _model_card(args: argparse.Namespace) -> str:
-    motion = (
-        f"\nThe motion is LAFAN1's `{args.motion}`, retargeted to the G1 in "
-        f"[{LAFAN1[0]}](https://huggingface.co/datasets/{LAFAN1[0]}); "
-        "LAFAN1 is CC BY-NC-ND 4.0.\n"
-        if args.env == TRACKING
-        else ""
-    )
+    if args.env != TRACKING:
+        motion = ""
+    elif args.motion in CLIPS:
+        motion = f"\nThe motion is {CLIPS[args.motion][1]}.\n"
+    else:
+        motion = (
+            f"\nThe motion is LAFAN1's `{args.motion}`, retargeted to the G1 in "
+            f"[{LAFAN1[0]}](https://huggingface.co/datasets/{LAFAN1[0]}); "
+            "LAFAN1 is CC BY-NC-ND 4.0.\n"
+        )
     return f"""\
 ---
 tags: [mujoco-playground, mjswan, robotics, reinforcement-learning]
@@ -206,10 +223,14 @@ def _motion(args: argparse.Namespace) -> Path:
     npz = args.out / "motion" / f"{args.motion}.npz"
     if not npz.exists():
         npz.parent.mkdir(parents=True, exist_ok=True)
-        repo, revision = LAFAN1
-        csv = hf_hub_download(
-            repo, f"g1/{args.motion}.csv", repo_type="dataset", revision=revision
-        )
+        if args.motion in CLIPS:
+            csv = npz.with_suffix(".csv")
+            urllib.request.urlretrieve(CLIPS[args.motion][0], csv)
+        else:
+            repo, revision = LAFAN1
+            csv = hf_hub_download(
+                repo, f"g1/{args.motion}.csv", repo_type="dataset", revision=revision
+            )
         subprocess.run(
             [
                 sys.executable,
@@ -555,7 +576,9 @@ def _contract(args, env_cfg, actor_groups, mj_model, control_dt: float) -> dict:
         name = name[0] if isinstance(name, list) else name
         camera["fovy"] = float(mj_model.cam_fovy[mj_model.camera(name).id])
         contract["camera"] = camera
-    if args.env == TRACKING:
+    if args.env == TRACKING and args.motion in CLIPS:
+        contract["motion"] = {"name": args.motion, "source": CLIPS[args.motion][0]}
+    elif args.env == TRACKING:
         contract["motion"] = {
             "dataset": LAFAN1[0],
             "revision": LAFAN1[1],
@@ -757,8 +780,9 @@ def main() -> None:
         )
         step.add_argument(
             "--motion",
-            default="dance1_subject2",
-            help=f"{TRACKING}'s clip, a file name in {LAFAN1[0]}'s g1/ without .csv",
+            default="100style_neutral_fw",
+            help=f"{TRACKING}'s clip: one of {sorted(CLIPS)}, or a file name in "
+            f"{LAFAN1[0]}'s g1/ without .csv",
         )
         step.add_argument(
             "--iterations", type=int, help="default: Playground's own for --env"
