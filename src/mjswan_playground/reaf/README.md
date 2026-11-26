@@ -99,10 +99,14 @@ uv run --extra reaf python -m mjswan_playground.reaf.check \
   passive, as in Playground, and both arms' names read `right_joint_0` for
   `right/joint_0`, since mjlab keeps only what follows an entity's last `/`.
 - **In colour where the policy allows.** Playground's cart-pole has no colours, and it
-  draws the SO-101's vision scene without materials; `CartpoleBalance` and
-  `CartpoleSwingUp` take the DeepMind Control Suite's own, and `SO101PickCubeVision` the
-  arm's Menagerie materials and the checkered floor, which its wrist camera sees too.
-  `CartpoleBalanceVision` stays gray: in colour its policy fails.
+  draws the SO-101's vision scene without materials and the Trossen's in flat colour;
+  `CartpoleBalance` and `CartpoleSwingUp` take the DeepMind Control Suite's own, and
+  `SO101PickCubeVision` the arm's Menagerie materials and the checkered floor, which its
+  wrist camera sees too. `CartpoleBalanceVision` and `TrossenPickCubeVision` stay as
+  Playground draws them: in colour their policies fail.
+- **The pick-cube scenes have no time limit.** Playground ends their episodes after
+  20 s and starts the arm, the cube and the target again; here an episode lasts until it
+  is reset, so a cube knocked out of reach stays there.
 - **The cameras are drawn by three.js**, not Playground's ray tracer, so their shading
   differs from what the vision policies trained on.
 - **`CartpoleBalanceVision` stacks its frames in the policy.** mjswan 0.13.1 declares no
