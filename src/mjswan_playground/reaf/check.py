@@ -4,10 +4,11 @@
 
 EXPORT_DIR holds `contract.json`, `reference.npz` and `policy.onnx`. Each step of the
 reference rollout, Playground's state goes into the scene's mjlab env; the scene's
-observations must then be Playground's, the policy's actions on them Playground's, and
-the controls those actions give Playground's next ones. A camera's own frames are only
-reported, since each renderer draws its own: Playground's frame goes into the camera
-before the observations are taken, so they check what the scene makes of the pixels.
+observations must then be Playground's, the policy's actions on them Playground's, the
+controls those actions give Playground's next ones, and the physics and control
+timesteps Playground's. A camera's own frames are only reported, since each renderer
+draws its own: Playground's frame goes into the camera before the observations are
+taken, so they check what the scene makes of the pixels.
 
 Playground reads bodies and sites from the kinematics `mj_step` computes before its last
 physics substep moves the joints, so after the first step of an episode the check takes
@@ -208,10 +209,17 @@ def check(env_id: str, export_dir: Path, in_keys: list[str] | None) -> bool:
     def note(key: str, value: float) -> None:
         errors[key] = max(errors.get(key, 0.0), value)
 
+    # The replay never steps the physics, so its timing is checked on its own.
+    timestep = env_cfg.sim.mujoco.timestep
+    note("physics_dt", abs(timestep - contract["physics_dt"]))
+    note("control_dt", abs(timestep * env_cfg.decimation - contract["control_dt"]))
+
     steps = len(ref["action"])
+    # mjswan's own training script, which exported the SO-101's, records no `done`.
+    done = ref["done"] if "done" in ref.files else np.zeros(steps, bool)
     env.reset()
     for t in range(steps):
-        fresh = t == 0 or bool(ref["done"][t - 1])
+        fresh = t == 0 or bool(done[t - 1])
         if fresh and t:
             env.reset()
         data.qpos[0, torch.as_tensor(q)] = torch.as_tensor(
@@ -286,7 +294,7 @@ def check(env_id: str, export_dir: Path, in_keys: list[str] | None) -> bool:
         )
         env.action_manager.apply_action()
         env.scene.write_data_to_sim()
-        if t + 1 < steps and not ref["done"][t]:
+        if t + 1 < steps and not done[t]:
             ctrl = clip(data.ctrl[0].cpu().numpy()[u])
             note("ctrl", float(np.abs(ctrl - clip(ref["ctrl"][t + 1][pg_u])).max()))
 
