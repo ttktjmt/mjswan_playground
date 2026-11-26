@@ -171,8 +171,7 @@ def check(env_id: str, export_dir: Path, in_keys: list[str] | None) -> bool:
     contract = json.loads((export_dir / "contract.json").read_text())
     ref = np.load(export_dir / "reference.npz")
     env_cfg, added = _env_cfg(env_id)
-    # A policy the scene builds itself (CartpoleBalanceVision's frame stack) is built
-    # from the Hub's; it is checked as the scene runs it.
+    # A policy the scene wraps around the Hub's is checked as the scene runs it.
     model = added.get("policy")
     source = (
         model.SerializeToString() if model is not None else export_dir / "policy.onnx"

@@ -17,9 +17,8 @@ from mjswan_playground._deps import CACHE_DIR
 
 from ._common import MENAGERIE, fetch
 
-#: The policy `train.py` trains on `G1WholeBodyTracking` with
-#: `--motion 100style_neutral_fw`, as its repository and revision; None until it is on
-#: the Hub.
+#: The policy `train.py` trains with `--motion 100style_neutral_fw`, as its repository
+#: and revision; None until it is on the Hub.
 POLICY: tuple[str, str] | None = None
 #: 100STYLE's neutral forward walk on the G1, from `retarget_100style.py`.
 CLIP = "100style_neutral_fw"
