@@ -425,7 +425,9 @@ def train(args: argparse.Namespace) -> None:
     def push(saved: Path) -> None:
         try:
             _push(args.hf_repo, saved, f"checkpoints/{saved.name}")
-        except Exception as error:  # Not fatal: a later checkpoint uploads in its place.
+        except (
+            Exception
+        ) as error:  # Not fatal: a later checkpoint uploads in its place.
             failed.add(saved)
             print(f"Could not upload {saved.name} to the Hub: {error}", flush=True)
 
