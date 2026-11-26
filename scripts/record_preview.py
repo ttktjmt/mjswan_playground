@@ -357,6 +357,12 @@ PREVIEWS: dict[str, Preview | tuple[Preview, ...]] = {
     ),
     # The tilt check reads the cube, the only free joint, which turns about the vertical.
     "leap": Preview(crop="540:395:105:72", seconds=8.0),
+    # One cut per environment, from a reset so the pick is in it. The root is the cube,
+    # the only free joint, which the arm picks up and turns.
+    "reaf": tuple(
+        Preview(scene=scene, crop="840:615:60:20", from_reset=True, upright=False)
+        for scene in ("so101pickcube", "so101pickcubevision")
+    ),
     "asimov": (
         # Forward on the panel's joystick: left alone, the twist can stand still a while.
         Preview(
@@ -763,10 +769,13 @@ _TELEMETRY = """(() => {
         const infer = rt.runOnnxInference.bind(rt);
         rt.runOnnxInference = (o) => (watch(), (obs = o), infer(o));
         const step = rt.executeSimulationSteps.bind(rt);
-        rt.executeSimulationSteps = () => {
-            step();
+        // mjswan 0.13 may split a control step's substeps over several `(from, to)`
+        // calls: pass them on, and count the step once, at its last substep.
+        rt.executeSimulationSteps = (...a) => {
+            const reset = step(...a);
+            if (typeof a[1] === "number" && a[1] < rt.decimation) return reset;
             const m = rt.mjModel, d = rt.mjData;
-            if (!m || !d) return;
+            if (!m || !d) return reset;
             if (m !== model) {
                 [model, root] = [m, rootOf(m)];
                 if (root !== null) up = upIn(m.qpos0, root);
@@ -789,6 +798,7 @@ _TELEMETRY = """(() => {
                 s.tilt = (Math.acos(Math.max(-1, Math.min(1, c))) * 180) / Math.PI;
             }
             rec.steps.push(s);
+            return reset;
         };
     };
 })();"""

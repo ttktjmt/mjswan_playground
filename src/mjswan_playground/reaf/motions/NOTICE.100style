@@ -1,0 +1,5 @@
+100style_neutral_fw.csv is from The 100STYLE Dataset - Ian Mason
+(https://ianxmason.github.io/100style/), licensed under CC BY 4.0
+(https://creativecommons.org/licenses/by/4.0/). It is 20 s of Neutral/Neutral_FW.bvh
+from frame 807, retargeted onto the Unitree G1 with GMR (gmr_plus) by
+retarget_100style.py, at 30 fps.
