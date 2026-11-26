@@ -61,12 +61,13 @@ def _fetch_mjcf(repo: tuple[str, str], path: str) -> Path:
         "mesh": compiler.get("meshdir", asset_dir),
         "texture": compiler.get("texturedir", asset_dir),
     }
-    files = [
+    # Once each: two threads fetching one file would race on its `.part`.
+    files = {
         posixpath.normpath(posixpath.join(posixpath.dirname(path), directory, file))
         for tag, directory in dirs.items()
         for element in root.iter(tag)
         if (file := element.get("file"))
-    ]
+    }
     with ThreadPoolExecutor(max_workers=4) as pool:
         list(pool.map(lambda file: fetch(repo, file), files))
     return xml_path
