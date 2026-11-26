@@ -17,9 +17,12 @@ from mjswan_playground._deps import CACHE_DIR
 
 from ._common import MENAGERIE, fetch
 
-#: The policy `train.py` trains with `--motion 100style_neutral_fw`, as its repository
-#: and revision; None until it is on the Hub.
-POLICY: tuple[str, str] | None = None
+#: Trained by `train.py --motion 100style_neutral_fw` on Playground 1.1.0's
+#: `G1WholeBodyTracking`, 5500 of its 30000 iterations.
+POLICY: tuple[str, str] | None = (
+    "ttktjmt/g1-whole-body-tracking-100style-neutral-fw",
+    "f5633d248d7d07c6b2b22b1c33027136c93b04fa",
+)
 #: 100STYLE's neutral forward walk on the G1, from `retarget_100style.py`.
 CLIP = "100style_neutral_fw"
 CSV = Path(__file__).parent / "motions" / f"{CLIP}.csv"
@@ -118,7 +121,7 @@ def add_scenes(project: mjswan.ProjectHandle) -> None:
     if POLICY is None:
         return
     repo, revision = POLICY
-    (policy,) = scene.add_policy_hf(repo, revision=revision, name="Walk")
+    policy = scene.add_policy_hf(repo, revision=revision, name="Walk")[0]
     motion = cfg.commands["motion"]
     policy.add_motion(
         name="Neutral walk",

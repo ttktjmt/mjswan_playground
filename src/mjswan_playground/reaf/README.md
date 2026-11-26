@@ -11,8 +11,9 @@ trained with mjswan's
 and [ttktjmt/cartpole-balance](https://huggingface.co/ttktjmt/cartpole-balance),
 [ttktjmt/cartpole-swing-up](https://huggingface.co/ttktjmt/cartpole-swing-up),
 [ttktjmt/cartpole-balance-vision](https://huggingface.co/ttktjmt/cartpole-balance-vision),
-[ttktjmt/trossen-pick-cube](https://huggingface.co/ttktjmt/trossen-pick-cube) and
-[ttktjmt/trossen-pick-cube-vision](https://huggingface.co/ttktjmt/trossen-pick-cube-vision),
+[ttktjmt/trossen-pick-cube](https://huggingface.co/ttktjmt/trossen-pick-cube),
+[ttktjmt/trossen-pick-cube-vision](https://huggingface.co/ttktjmt/trossen-pick-cube-vision) and
+[ttktjmt/g1-whole-body-tracking-100style-neutral-fw](https://huggingface.co/ttktjmt/g1-whole-body-tracking-100style-neutral-fw),
 trained with [`train.py`](train.py) ·
 the SO-101 (Apache-2.0), the Trossen WXAI, the ALOHA table and the Unitree G1
 (BSD-3-Clause) from [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) ·
@@ -33,7 +34,7 @@ that reaf-sim's documentation embeds on that environment's page.
 | `CartpoleBalanceVision` | `reaf-cartpole-balance-vision` | Balancing from the last three grayscale frames of a fixed camera, at 50 Hz. |
 | `TrossenPickCube` | `reaf-trossen-pick-cube` | The Trossen WXAI's right arm lifts a cube on a table to a target that moves every 4 to 7 s, at 50 Hz. |
 | `TrossenPickCubeVision` | `reaf-trossen-pick-cube-vision` | The same, finding the cube through its wrist camera. |
-| `G1WholeBodyTracking` | `reaf-g1-whole-body-tracking` | The Unitree G1 walks and turns as 100STYLE's actor does, tracking a 20 s clip with its whole body, at 50 Hz. No policy yet. |
+| `G1WholeBodyTracking` | `reaf-g1-whole-body-tracking` | The Unitree G1 walks and turns as 100STYLE's actor does, tracking a 20 s clip with its whole body, at 50 Hz. |
 
 ## Run
 
@@ -44,8 +45,7 @@ uv run msp run reaf-so101-pick-cube    # one of them
 
 The first build fetches the robots and the table from MuJoCo Menagerie at a pinned commit into
 `.cache/reaf/`, and each policy from the Hugging Face Hub at a pinned revision. The G1's
-clip is in [`motions/`](motions/), converted as Playground's `csv_to_npz` converts it. A
-scene whose policy is not trained yet builds without one.
+clip is in [`motions/`](motions/), converted as Playground's `csv_to_npz` converts it.
 
 | From | Used as |
 |---|---|
@@ -62,6 +62,7 @@ scene whose policy is not trained yet builds without one.
 | Hub `ttktjmt/so101-pick-cube-vision` at `c1b4d11` | `SO101PickCubeVision`'s policy, 1800 of its 3000 iterations |
 | Hub `ttktjmt/trossen-pick-cube` at `e0b52c5` | `TrossenPickCube`'s policy, all 1000 iterations on Playground 1.1.0 |
 | Hub `ttktjmt/trossen-pick-cube-vision` at `8ca63be` | `TrossenPickCubeVision`'s policy, all 3000 iterations on Playground 1.1.0 |
+| Hub `ttktjmt/g1-whole-body-tracking-100style-neutral-fw` at `f5633d2` | `G1WholeBodyTracking`'s policy, 5500 of its 30000 iterations on Playground 1.1.0 |
 | Hub `ttktjmt/cartpole-balance` at `9a0d9f0`, `ttktjmt/cartpole-swing-up` at `75170d8`, `ttktjmt/cartpole-balance-vision` at `18888ec` | the cart-pole policies, trained on Playground 1.1.0 |
 
 ## Train and check
